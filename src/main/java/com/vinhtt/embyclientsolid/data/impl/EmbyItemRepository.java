@@ -135,24 +135,40 @@ public class EmbyItemRepository implements IItemRepository {
 
     @Override
     public List<BaseItemDto> getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive) throws ApiException {
-        // Logic này từ EmbyService.java cũ
+        System.out.println();
+        // --- LOGIC MỚI (LẦN 5) - Sửa lại Studio theo yêu cầu của ông ---
         String apiParam;
 
         switch (chipType) {
             case "TAG":
-                apiParam = chip.serialize(); // Tag dùng tên đã serialize
+                apiParam = chip.serialize(); // Tag dùng tên đã serialize (JSON hoặc text)
+                // Lệnh gọi này ĐÚNG: apiParam được truyền vào 'tags' (tham số 59)
                 return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null).getItems();
+
             case "STUDIO":
-                apiParam = chip.getId(); // Studio dùng ID
-                if (apiParam == null) throw new ApiException("Studio ID is null for: " + chip.getDisplayName());
+                // --- SỬA LỖI THEO YÊU CẦU: Dùng TÊN (serialize) thay vì ID ---
+                apiParam = chip.serialize(); // Studio dùng TÊN (hoặc JSON string)
+                if (apiParam == null) throw new ApiException("Studio Name is null for: " + chip.getDisplayName());
+                // SỬA LỖI: apiParam (TÊN) được truyền vào 'studios' (tham số 69)
                 return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null).getItems();
+
             case "PEOPLE":
+                // --- GIỮ NGUYÊN: Dùng ID (Vì ông nói nó OK) ---
                 apiParam = chip.getId(); // People dùng ID
                 if (apiParam == null) throw new ApiException("People ID is null for: ".concat(chip.getDisplayName()));
-                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null,null).getItems();
+                // SỬA LỖI: apiParam (ID) được truyền vào 'personIds' (tham số 67)
+                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                        null, null,null,
+                        apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null).getItems();
+
             case "GENRE":
+                // --- GIỮ NGUYÊN: Dùng TÊN (Vì ông nói nó OK) ---
                 apiParam = chip.getDisplayName(); // Genre dùng tên hiển thị
-                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, null, null, null, null, "Movie, Series, Video, Game, MusicAlbum", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null).getItems();
+                // Lệnh gọi này ĐÚNG: apiParam được truyền vào 'nameGenres' (tham số 57)
+                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, null, null, null, null, "Movie, Series, Video, Game, MusicAlbum", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                        null,
+                        apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null).getItems();
+
             default:
                 return Collections.emptyList();
         }
