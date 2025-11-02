@@ -3,7 +3,7 @@
 - [x] Giai đoạn 1: Lõi Trừu tượng (Interfaces & Models)
 - [x] Giai đoạn 2: Triển khai Dịch vụ Cốt lõi & Phiên (Services & Session)
 - [x] Giai đoạn 3: Trừu tượng hóa & Triển khai Tầng Dữ liệu (Data Layer)
-- [ ] Giai đoạn 4: Dịch vụ Tương tác & Thông báo (Core Services Pt. 2)
+- [x] Giai đoạn 4: Dịch vụ Tương tác & Thông báo (Core Services Pt. 2)
 - [ ] Giai đoạn 5: Dịch vụ Điều hướng & Hotkey (Core Services Pt. 3)
 - [ ] Giai đoạn 6: Màn hình Đăng nhập (View + ViewModel)
 - [ ] Giai đoạn 7: Màn hình Chính (Main View + ViewModel)
