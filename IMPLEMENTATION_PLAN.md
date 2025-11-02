@@ -6,7 +6,7 @@
 - [x] Giai đoạn 4: Dịch vụ Tương tác & Thông báo (Core Services Pt. 2)
 - [x] Giai đoạn 5: Dịch vụ Điều hướng & Hotkey (Core Services Pt. 3)
 - [x] Giai đoạn 6: Màn hình Đăng nhập (View + ViewModel)
-- [ ] Giai đoạn 7: Màn hình Chính (Main View + ViewModel)
+- [x] Giai đoạn 7: Màn hình Chính (Main View + ViewModel)
 - [ ] Giai đoạn 8: Cột Thư viện (Tree View + VM)
 - [ ] Giai đoạn 9: Cột Lưới Item (Grid View + VM)
 - [ ] Giai đoạn 10: Cột Chi tiết (Detail View + VM)

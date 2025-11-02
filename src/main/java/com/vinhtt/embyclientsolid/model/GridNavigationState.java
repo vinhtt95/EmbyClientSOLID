@@ -6,8 +6,18 @@ import java.util.Objects;
  * POJO lưu trữ một trạng thái điều hướng của ItemGridView.
  * Dùng cho chức năng "Back" và "Forward" (UR-29, UR-13, UR-14).
  * Đã cập nhật để sử dụng 'Tag' thay vì 'TagModel'.
+ *
+ * (Cập nhật: Thêm ScrollAction enum).
  */
 public class GridNavigationState {
+
+    /**
+     * Enum báo hiệu hành động cuộn cần thực hiện sau khi tải trang mới.
+     * (Được chuyển từ ItemGridViewModel cũ).
+     */
+    public enum ScrollAction {
+        NONE, SCROLL_TO_TOP, SCROLL_TO_BOTTOM
+    }
 
     /**
      * Định nghĩa các loại trạng thái điều hướng.

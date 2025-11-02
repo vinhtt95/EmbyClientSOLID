@@ -1,6 +1,14 @@
 package com.vinhtt.embyclientsolid;
 
 import com.vinhtt.embyclientsolid.core.*;
+import com.vinhtt.embyclientsolid.data.IExternalDataService;
+import com.vinhtt.embyclientsolid.data.IItemRepository;
+import com.vinhtt.embyclientsolid.data.IItemUpdateService;
+import com.vinhtt.embyclientsolid.data.IStaticDataRepository;
+import com.vinhtt.embyclientsolid.data.impl.EmbyItemRepository;
+import com.vinhtt.embyclientsolid.data.impl.EmbyItemUpdateService;
+import com.vinhtt.embyclientsolid.data.impl.EmbyStaticDataRepository;
+import com.vinhtt.embyclientsolid.data.impl.ExternalMovieDataService;
 import com.vinhtt.embyclientsolid.navigation.AppNavigator;
 import com.vinhtt.embyclientsolid.services.DesktopInteractionService;
 import com.vinhtt.embyclientsolid.services.JavaPreferenceService;
@@ -14,12 +22,17 @@ import javafx.stage.Stage;
  * Lớp chính của ứng dụng EmbyClientSOLID.
  * Đóng vai trò là "Composition Root" - nơi khởi tạo và
  * tiêm (inject) các dependencies (services).
+ *
+ * (Cập nhật Giai đoạn 7):
+ * - Khởi tạo tất cả các services và repositories.
+ * - Tiêm (inject) tất cả vào AppNavigator.
+ * - Thêm logic lưu/khôi phục vị trí cửa sổ (UR-6).
  */
 public class MainApp extends Application {
 
     private IAppNavigator appNavigator;
     private IEmbySessionService sessionService;
-    // (Các service khác có thể được giữ ở đây nếu cần shutdown, ví dụ: global hotkey)
+    private IPreferenceService preferenceService;
 
     /**
      * Phương thức start, entry point cho JavaFX.
@@ -33,34 +46,72 @@ public class MainApp extends Application {
         // --- KHỞI TẠO DEPENDENCY INJECTION (COMPOSITION ROOT) ---
 
         // 1. Khởi tạo các Service Cốt lõi (Giai đoạn 2 & 4)
-        IPreferenceService preferenceService = new JavaPreferenceService();
+        this.preferenceService = new JavaPreferenceService();
         IConfigurationService configService = new JsonConfigurationService();
         this.sessionService = new EmbySessionService(preferenceService);
-
-        // (Khởi tạo các service Giai đoạn 4 - chưa dùng đến ở Giai đoạn 6 nhưng
-        // AppNavigator sẽ cần chúng ở các giai đoạn sau)
         ILocalInteractionService localInteractionService = new DesktopInteractionService(configService);
         INotificationService notificationService = new NotificationService(configService);
 
-        // (Khởi tạo các repo Giai đoạn 3 - chưa dùng đến ở Giai đoạn 6)
-        // IItemRepository itemRepository = new EmbyItemRepository(sessionService);
-        // ...
+        // 2. Khởi tạo các Repository (Giai đoạn 3)
+        // (Lưu ý: Các repo cần sessionService)
+        IItemRepository itemRepository = new EmbyItemRepository(sessionService);
+        IStaticDataRepository staticDataRepository = new EmbyStaticDataRepository(sessionService);
+        IExternalDataService externalDataService = new ExternalMovieDataService();
+        // (Lưu ý: EmbyItemUpdateService cần IItemRepository để đọc DTOs khi clone)
+        IItemUpdateService itemUpdateService = new EmbyItemUpdateService(sessionService, itemRepository);
 
-        // 2. Khởi tạo Navigator (Giai đoạn 5) và tiêm services
-        // (Tạm thời chỉ tiêm các service cần cho Giai đoạn 6)
-        this.appNavigator = new AppNavigator(sessionService, configService);
-        this.appNavigator.initialize(primaryStage);
+        // 3. Khởi tạo Navigator (Giai đoạn 5) và tiêm MỌI THỨ
+        this.appNavigator = new AppNavigator(
+                primaryStage,
+                sessionService,
+                configService,
+                preferenceService,
+                notificationService,
+                localInteractionService,
+                itemRepository,
+                staticDataRepository,
+                itemUpdateService,
+                externalDataService
+        );
 
         // --- KẾT THÚC DI ---
 
+        // 4. Cấu hình Stage chính (UR-6)
+        setupPrimaryStage(primaryStage, preferenceService);
 
-        // 3. Khởi chạy ứng dụng
+        // 5. Khởi chạy ứng dụng
         // Cố gắng khôi phục session (UR-4)
         if (sessionService.tryRestoreSession()) {
             appNavigator.showMain();
         } else {
             appNavigator.showLogin();
         }
+    }
+
+    /**
+     * Cấu hình Stage chính, bao gồm khôi phục và lưu vị trí/kích thước.
+     * (UR-6)
+     *
+     * @param primaryStage      Stage chính.
+     * @param preferenceService Service để đọc/ghi cài đặt.
+     */
+    private void setupPrimaryStage(Stage primaryStage, IPreferenceService preferenceService) {
+        // Khôi phục vị trí (UR-6)
+        primaryStage.setX(preferenceService.getDouble("windowX", 100));
+        primaryStage.setY(preferenceService.getDouble("windowY", 100));
+        // Khôi phục kích thước (UR-6)
+        primaryStage.setWidth(preferenceService.getDouble("windowWidth", 2000));
+        primaryStage.setHeight(preferenceService.getDouble("windowHeight", 1400));
+
+        // Thêm listener để lưu vị trí/kích thước khi đóng (UR-6)
+        primaryStage.setOnCloseRequest(e -> {
+            preferenceService.putDouble("windowX", primaryStage.getX());
+            preferenceService.putDouble("windowY", primaryStage.getY());
+            preferenceService.putDouble("windowWidth", primaryStage.getWidth());
+            preferenceService.putDouble("windowHeight", primaryStage.getHeight());
+            preferenceService.flush();
+            // (Chúng ta có thể thêm logic shutdown hook cho các service ở đây nếu cần)
+        });
     }
 
     /**
