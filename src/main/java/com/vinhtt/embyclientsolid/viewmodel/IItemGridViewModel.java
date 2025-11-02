@@ -12,6 +12,8 @@ import javafx.collections.ObservableList;
 /**
  * Interface cho ItemGridViewModel (Cột 2).
  * (UR-19 đến UR-29).
+ *
+ * (Cập nhật GĐ 9: Thêm getPrimaryImageUrl)
  */
 public interface IItemGridViewModel {
 
@@ -50,4 +52,5 @@ public interface IItemGridViewModel {
     void selectAndPlayPreviousItem();
     boolean isPlayAfterSelect();
     void clearPlayAfterSelect();
+    String getPrimaryImageUrl(BaseItemDto item);
 }

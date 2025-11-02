@@ -32,6 +32,8 @@ import java.util.Map;
  * Controller cho ItemGridView.fxml (Cột 2).
  * Là một View "ngu ngốc".
  * (UR-19 đến UR-29).
+ *
+ * (Cập nhật GĐ 9: Sửa lỗi ảnh)
  */
 public class ItemGridController {
 
@@ -219,7 +221,10 @@ public class ItemGridController {
         imageView.getStyleClass().add("item-image");
 
         // (UR-25: Thumbnail)
+        // --- SỬA LỖI 1: Gọi ViewModel để lấy URL ---
         String imageUrl = getImageUrl(item);
+        // --- KẾT THÚC SỬA LỖI ---
+
         Image image = new Image(imageUrl, true); // true = tải nền
         imageView.setImage(image);
 
@@ -276,29 +281,17 @@ public class ItemGridController {
     }
 
     /**
-     * Helper lấy URL ảnh (sẽ cần IEmbySessionService, tạm thời hardcode).
+     * (SỬA LỖI 1: Sửa hàm này)
+     * Helper lấy URL ảnh.
      */
     private String getImageUrl(BaseItemDto item) {
-        // (Đây là phần logic lẽ ra phải lấy từ EmbySessionService,
-        // nhưng Controller không nên biết, nên IItemGridViewModel nên
-        // cung cấp 1 hàm helper để lấy URL)
-        // (Tạm thời bỏ qua, vì ViewModel không có sessionService)
-        // (Cập nhật: ViewModel cũng không nên biết, chúng ta sẽ bỏ qua
-        // việc lấy serverUrl và dùng ảnh placeholder)
-
-        // (Logic lấy URL thật - Sẽ thất bại nếu API client chưa sẵn sàng)
-        try {
-            // (Cần 1 cách tốt hơn để lấy ApiClient, nhưng tạm thời)
-            // String serverUrl = "http://localhost:8096"; // Hardcode
-            // if (item.getId() != null && item.getImageTags() != null && item.getImageTags().containsKey("Primary")) {
-            //     String imageTag = item.getImageTags().get("Primary");
-            //     return String.format("%s/Items/%s/Images/Primary?tag=%s&maxWidth=%d&quality=80",
-            //             serverUrl, item.getId(), imageTag, (int)CELL_WIDTH * 2);
-            // }
-        } catch (Exception e) {
-            // Bỏ qua
+        if (viewModel != null) {
+            String url = viewModel.getPrimaryImageUrl(item);
+            if (url != null) {
+                return url;
+            }
         }
-
+        // Fallback (ảnh placeholder) nếu ViewModel bị null hoặc không trả về URL
         return "https://placehold.co/" + (int)CELL_WIDTH + "x" + (int)IMAGE_HEIGHT + "/333/999?text=" + (item.getType() != null ? item.getType() : "Item");
     }
 }

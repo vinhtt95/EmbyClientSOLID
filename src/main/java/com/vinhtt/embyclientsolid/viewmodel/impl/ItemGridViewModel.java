@@ -1,5 +1,6 @@
 package com.vinhtt.embyclientsolid.viewmodel.impl;
 
+import com.vinhtt.embyclientsolid.core.IEmbySessionService; // <-- THÊM IMPORT
 import com.vinhtt.embyclientsolid.core.ILocalInteractionService;
 import com.vinhtt.embyclientsolid.core.INotificationService;
 import com.vinhtt.embyclientsolid.data.IItemRepository;
@@ -23,17 +24,22 @@ import java.util.Stack;
 
 /**
  * Triển khai (Implementation) của IItemGridViewModel (Cột 2).
- * Logic được chuyển từ ItemGridViewModel.java cũ.
  * (UR-19 đến UR-29).
+ *
+ * (Cập nhật GĐ 9: Sửa lỗi Status và Ảnh)
  */
 public class ItemGridViewModel implements IItemGridViewModel {
 
     private static final int ITEMS_PER_LOAD = 50; // (UR-23)
 
+    private static final double CELL_HEIGHT = 320;
+    private static final double CELL_WIDTH = CELL_HEIGHT * 16 / 9;
+
     // --- Services (DI) ---
     private final IItemRepository itemRepository;
     private final INotificationService notificationService;
     private final ILocalInteractionService localInteractionService; // (Cho UR-27)
+    private final IEmbySessionService sessionService; // <-- SỬA LỖI 1: Thêm service
 
     // --- Trạng thái nội bộ ---
     private int totalCount = 0;
@@ -61,7 +67,6 @@ public class ItemGridViewModel implements IItemGridViewModel {
     private final ReadOnlyBooleanWrapper showStatusMessage = new ReadOnlyBooleanWrapper(true);
     private final ObservableList<BaseItemDto> items = FXCollections.observableArrayList();
     private final ObjectProperty<BaseItemDto> selectedItem = new SimpleObjectProperty<>();
-    // (SỬA LỖI TẠI ĐÂY: Tham chiếu đến enum trong GridNavigationState)
     private final ReadOnlyObjectWrapper<GridNavigationState.ScrollAction> scrollAction = new ReadOnlyObjectWrapper<>(GridNavigationState.ScrollAction.NONE);
     private final ReadOnlyBooleanWrapper hasNextPage = new ReadOnlyBooleanWrapper(false);
     private final ReadOnlyBooleanWrapper hasPreviousPage = new ReadOnlyBooleanWrapper(false);
@@ -73,20 +78,43 @@ public class ItemGridViewModel implements IItemGridViewModel {
      * @param itemRepository Repo Đọc Item (DI).
      * @param notificationService Service Thông báo (DI).
      * @param localInteractionService Service Tương tác (DI).
+     * @param sessionService Service Phiên (DI). (SỬA LỖI 1)
      */
-    public ItemGridViewModel(IItemRepository itemRepository, INotificationService notificationService, ILocalInteractionService localInteractionService) {
+    public ItemGridViewModel(
+            IItemRepository itemRepository,
+            INotificationService notificationService,
+            ILocalInteractionService localInteractionService,
+            IEmbySessionService sessionService // <-- SỬA LỖI 1: Thêm tham số
+    ) {
         this.itemRepository = itemRepository;
         this.notificationService = notificationService;
         this.localInteractionService = localInteractionService;
+        this.sessionService = sessionService; // <-- SỬA LỖI 1: Lưu service
 
-        statusMessage.set(notificationService.statusMessageProperty().get()); // Lấy giá trị ban đầu
-        notificationService.statusMessageProperty().addListener((obs, oldVal, newVal) -> {
-            // Chỉ cập nhật status nếu không phải là status của riêng Grid
-            if (!loading.get() && !showStatusMessage.get()) {
-                statusMessage.set(newVal);
-            }
-        });
+        // --- SỬA LỖI 2: Xóa listener tại đây ---
+        // Không lắng nghe global status, chỉ đặt status của riêng Grid
+        this.statusMessage.set("Vui lòng chọn thư viện...");
     }
+
+    /**
+     * (SỬA LỖI 1: Thêm hàm mới)
+     * Lấy URL ảnh Primary (UR-25).
+     * Logic được sao chép từ ItemDetailViewModel.
+     */
+    @Override
+    public String getPrimaryImageUrl(BaseItemDto item) {
+        if (item != null && item.getImageTags() != null && item.getImageTags().containsKey("Primary")) {
+            String tag = item.getImageTags().get("Primary");
+            String serverUrl = sessionService.getApiClient().getBasePath();
+            // (Kích thước ảnh thumbnail)
+            int width = (int) (CELL_WIDTH * 1.5); // Lấy ảnh lớn hơn 1 chút cho đẹp
+
+            return String.format("%s/Items/%s/Images/Primary?tag=%s&maxWidth=%d&quality=90",
+                    serverUrl, item.getId(), tag, width);
+        }
+        return null; // Controller sẽ xử lý ảnh placeholder
+    }
+
 
     /**
      * Tạo một snapshot của trạng thái hiện tại.
@@ -237,7 +265,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
      */
     private void loadPageInternal(int pageIndex, String parentId, String itemIdToSelect) {
         loading.set(true);
-        showStatusMessage.set(true);
+        showStatusMessage.set(true); // Hiển thị status (của Cột 2)
+        // --- SỬA LỖI 2: Gọi global status ---
         notificationService.showStatus("Đang tải items...");
 
         new Thread(() -> {
@@ -255,6 +284,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
                         currentChipType = null;
                     }
                     updateStateFromQueryResult(result, pageIndex, itemIdToSelect);
+                    // --- SỬA LỖI 2: Clear global status ---
+                    notificationService.clearStatus();
                 });
 
             } catch (Exception e) {
@@ -269,6 +300,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
     private void loadSearchPageInternal(int pageIndex, String keywords, String itemIdToSelect) {
         loading.set(true);
         showStatusMessage.set(true);
+        // --- SỬA LỖI 2: Gọi global status ---
         notificationService.showStatus("Đang tìm kiếm...");
 
         new Thread(() -> {
@@ -285,6 +317,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
                         currentChipType = null;
                     }
                     updateStateFromQueryResult(result, pageIndex, itemIdToSelect);
+                    // --- SỬA LỖI 2: Clear global status ---
+                    notificationService.clearStatus();
                 });
 
             } catch (Exception e) {
@@ -295,12 +329,11 @@ public class ItemGridViewModel implements IItemGridViewModel {
 
     /**
      * Logic tải trang (cho CHIP).
-     * (Lưu ý: API getItemsByChip chưa hỗ trợ phân trang trong Giai đoạn 3,
-     * nên pageIndex và itemIdToSelect tạm thời chưa dùng).
      */
     private void loadItemsByChipInternal(int pageIndex, Tag chip, String chipType, String itemIdToSelect) {
         loading.set(true);
         showStatusMessage.set(true);
+        // --- SỬA LỖI 2: Gọi global status ---
         notificationService.showStatus("Đang tải theo chip...");
 
         new Thread(() -> {
@@ -320,6 +353,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
                         currentChipType = chipType;
                     }
                     updateStateFromQueryResult(result, 0, itemIdToSelect); // Luôn là trang 0
+                    // --- SỬA LỖI 2: Clear global status ---
+                    notificationService.clearStatus();
                 });
 
             } catch (Exception e) {
@@ -350,14 +385,15 @@ public class ItemGridViewModel implements IItemGridViewModel {
             }
             showStatusMessage.set(true);
         } else {
+            // Cập nhật status Cục bộ (của Cột 2)
             statusMessage.set(String.format("Đang hiển thị: %d/%d (%d items)", (pageIndex + 1), totalPages, totalCount));
-            showStatusMessage.set(false); // Ẩn status, hiện grid
+            showStatusMessage.set(false); // Ẩn status Cục bộ, hiện grid
         }
 
         // Chọn item
         selectItem(itemIdToSelect, pageItems);
 
-        loading.set(false);
+        loading.set(false); // Tắt loading Cục bộ (của Cột 2)
         isRestoringState = false; // Luôn reset cờ
         scrollAction.set(GridNavigationState.ScrollAction.NONE); // Reset cờ cuộn
     }
@@ -387,7 +423,10 @@ public class ItemGridViewModel implements IItemGridViewModel {
         System.err.println("Lỗi API khi tải Grid: " + e.getMessage());
         Platform.runLater(() -> {
             loading.set(false);
-            statusMessage.set("Lỗi tải items: " + e.getMessage());
+            // --- SỬA LỖI 2: Cập nhật cả 2 status ---
+            String errorMessage = "Lỗi tải items: " + e.getMessage();
+            statusMessage.set(errorMessage); // Status Cục bộ
+            notificationService.showStatus(errorMessage); // Status Toàn cục
             showStatusMessage.set(true);
             isRestoringState = false;
         });

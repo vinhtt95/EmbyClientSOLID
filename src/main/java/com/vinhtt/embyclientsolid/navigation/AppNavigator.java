@@ -28,8 +28,7 @@ import java.net.URL;
 
 /**
  * Triển khai (Implementation) của IAppNavigator.
- * (Cập nhật Giai đoạn 8, 9, 10: Tiêm (inject) đầy đủ service vào các ViewModel).
- * (Sửa lỗi: Tiêm INotificationService vào MainController).
+ * (Cập nhật Giai đoạn 9: Tiêm sessionService vào ItemGridViewModel).
  */
 public class AppNavigator implements IAppNavigator {
 
@@ -108,11 +107,14 @@ public class AppNavigator implements IAppNavigator {
                     notificationService
             );
 
+            // --- SỬA LỖI (Vấn đề 1): Tiêm sessionService vào đây ---
             IItemGridViewModel itemGridViewModel = new ItemGridViewModel(
                     itemRepository,
                     notificationService,
-                    localInteractionService // Cần cho PlayCommand (UR-27)
+                    localInteractionService, // Cần cho PlayCommand (UR-27)
+                    sessionService // <-- THÊM THAM SỐ NÀY
             );
+            // --- KẾT THÚC SỬA LỖI ---
 
             IItemDetailViewModel itemDetailViewModel = new ItemDetailViewModel(
                     itemRepository,
@@ -132,7 +134,7 @@ public class AppNavigator implements IAppNavigator {
                     itemDetailViewModel,
                     configService,
                     preferenceService,
-                    notificationService // <-- SỬA LỖI 1: Tiêm INotificationService
+                    notificationService
             );
 
             // 4. Tải FXML và tiêm Controller
