@@ -4,7 +4,7 @@
 - [x] Giai đoạn 2: Triển khai Dịch vụ Cốt lõi & Phiên (Services & Session)
 - [x] Giai đoạn 3: Trừu tượng hóa & Triển khai Tầng Dữ liệu (Data Layer)
 - [x] Giai đoạn 4: Dịch vụ Tương tác & Thông báo (Core Services Pt. 2)
-- [ ] Giai đoạn 5: Dịch vụ Điều hướng & Hotkey (Core Services Pt. 3)
+- [x] Giai đoạn 5: Dịch vụ Điều hướng & Hotkey (Core Services Pt. 3)
 - [ ] Giai đoạn 6: Màn hình Đăng nhập (View + ViewModel)
 - [ ] Giai đoạn 7: Màn hình Chính (Main View + ViewModel)
 - [ ] Giai đoạn 8: Cột Thư viện (Tree View + VM)
@@ -74,14 +74,11 @@ Dự án sẽ được xây dựng theo từng giai đoạn ("code lan"), đi t�
 
 ---
 ### Giai đoạn 5: Dịch vụ Điều hướng & Hotkey (Core Services Pt. 3)
-* **Mục tiêu:** Hoàn thiện hạ tầng services (Quản lý `Stage`/`Scene` và `JNativeHook`).
+* **Mục tiêu:** Hoàn thiện hạ tầng services (Quản lý `Stage`/`Scene`). (Đã loại bỏ Global Hotkey theo yêu cầu).
 * **File (Package `core`):**
     * `IAppNavigator.java` (Interface: `showLogin`, `showMain`, `showAddTagDialog`)
-    * `IGlobalHotkeyService.java` (Interface: `register`, `shutdown`)
 * **File (Package `navigation`):**
     * `AppNavigator.java` (Implement `IAppNavigator`, chứa logic `FXMLLoader.load()`).
-* **File (Package `services`):**
-    * `JNativeHookHotkeyService.java` (Implement `IGlobalHotkeyService`, chứa logic `GlobalScreen.registerNativeHook()`).
 * **Kiểm tra:** Hoàn tất toàn bộ tầng Services.
 
 ---
@@ -147,12 +144,12 @@ Dự án sẽ được xây dựng theo từng giai đoạn ("code lan"), đi t�
 
 ---
 ### Giai đoạn 12: Hoàn thiện Phím tắt & Pop-out
-* **Mục tiêu:** Kết nối các phím tắt và cửa sổ pop-out (UR-12, UR-13, UR-14, UR-50).
+* **Mục tiêu:** Kết nối các phím tắt *trong ứng dụng* và cửa sổ pop-out (UR-13, UR-14, UR-50). (Đã loại bỏ UR-12).
 * **File:**
-    * `MainApp.java` (Cập nhật: Đăng ký `IGlobalHotkeyService`).
-    * `controller.MainController.java` (Cập nhật: Đăng ký phím tắt *trong ứng dụng* (Cmd+S, Cmd+N...) và điều hướng chuột Back/Forward (UR-14)).
+    * `MainApp.java` (Cập nhật: Đăng ký phím tắt *trong ứng dụng*).
+    * `controller.MainController.java` (Cập nhật: Đăng ký phím tắt (Cmd+S, Cmd+N...) và điều hướng chuột Back/Forward (UR-14)).
     * `navigation.AppNavigator.java` (Cập nhật: Triển khai `showPopOutDetail()`).
-* **Kiểm tra:** Tất cả các phím tắt và cửa sổ pop-out hoạt động như mong đợi.
+* **Kiểm tra:** Tất cả các phím tắt trong ứng dụng và cửa sổ pop-out hoạt động như mong đợi.
 
 ---
 ### Giai đoạn 13: Hoàn thiện (Styling & I18n)

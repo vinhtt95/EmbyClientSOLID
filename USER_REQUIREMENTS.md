@@ -18,7 +18,6 @@ Dưới đây là danh sách 50 yêu cầu chức năng (UR) chi tiết được
 * **UR-11 (Quốc tế hóa - I18n):** Tất cả các chuỗi văn bản trên UI phải được tải từ tệp `config.json` bên ngoài.
 
 ## UR-HOTKEY: Phím tắt (Hotkeys & Shortcuts)
-* **UR-12 (Phím tắt Toàn cục):** Ứng dụng phải hỗ trợ phím tắt toàn hệ thống (ngay cả khi không focus) để "Phát item tiếp theo" (Cmd+Shift+N) và "Phát item trước đó" (Cmd+Shift+P).
 * **UR-13 (Phím tắt Trong ứng dụng):** Ứng dụng phải hỗ trợ các phím tắt khi đang focus:
     * `Cmd+S`: Lưu thay đổi ở cột Chi tiết.
     * `Cmd+N` / `Cmd+P`: Chọn item tiếp theo/trước đó trong lưới.

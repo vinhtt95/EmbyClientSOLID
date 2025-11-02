@@ -31,7 +31,6 @@ Kiến trúc mới tách biệt rõ ràng các mối quan tâm (concerns) bằng
 │   ├── IAppNavigator.java
 │   ├── IConfigurationService.java
 │   ├── IEmbySessionService.java
-│   ├── IGlobalHotkeyService.java
 │   ├── ILocalInteractionService.java
 │   ├── INotificationService.java
 │   └── IPreferenceService.java
