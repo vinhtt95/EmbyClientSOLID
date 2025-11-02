@@ -117,6 +117,7 @@ public class ItemDetailController {
     @FXML private HBox reviewPeopleContainer;
     @FXML private Button acceptPeopleButton;
     @FXML private Button rejectPeopleButton;
+    @FXML private Label overviewLabel;
 
 
     private IItemDetailViewModel viewModel;
@@ -190,6 +191,7 @@ public class ItemDetailController {
         peopleLabel.setText(configService.getString("itemDetailView", "peopleLabel"));
         addPeopleButton.setText(configService.getString("itemDetailView", "addButton"));
         clonePeopleButton.setText(configService.getString("itemDetailView", "cloneButton"));
+        overviewLabel.setText(configService.getString("itemDetailView", "overviewLabel"));
         overviewTextArea.setPromptText(configService.getString("itemDetailView", "overviewPrompt"));
         backdropGalleryLabel.setText(configService.getString("itemDetailView", "backdropGalleryLabel"));
         addBackdropButton.setText(configService.getString("itemDetailView", "addButton"));

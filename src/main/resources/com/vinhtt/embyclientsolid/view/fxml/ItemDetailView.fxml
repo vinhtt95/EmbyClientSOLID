@@ -22,7 +22,7 @@
 
     <VBox maxWidth="858.0" alignment="TOP_CENTER">
         <children>
-            <ScrollPane fx:id="mainScrollPane" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" minHeight="100.0" style="-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;"
+            <ScrollPane fx:id="mainScrollPane" fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" minHeight="100.0" style="-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;"
                         visible="false">
                 <content>
                     <VBox fx:id="detailContentPane" spacing="15.0">
@@ -216,7 +216,7 @@
                                     </HBox>
                                 </children>
                             </HBox>
-                            <TextArea fx:id="overviewTextArea" prefHeight="200.0" wrapText="true" />
+                            <TextArea fx:id="overviewTextArea" wrapText="true" VBox.vgrow="ALWAYS"/>
                             <Separator prefWidth="200.0">
                                 <VBox.margin>
                                     <Insets top="10.0" />
