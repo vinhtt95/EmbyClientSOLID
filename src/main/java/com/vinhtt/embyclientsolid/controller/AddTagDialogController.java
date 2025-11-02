@@ -127,7 +127,7 @@ public class AddTagDialogController {
         copyIdField.textProperty().bindBidirectional(viewModel.copyIdProperty());
 
         // (SỬA LỖI 1: Dòng này giờ đã hợp lệ)
-        copyStatusLabel.textProperty().bind(viewModel.copyStatusProperty());
+//        copyStatusLabel.textProperty().bind(viewModel.copyStatusProperty());
 
         // --- Binding FlowPanes Gợi ý ---
         viewModel.getSuggestionKeys().addListener((ListChangeListener<String>) c ->

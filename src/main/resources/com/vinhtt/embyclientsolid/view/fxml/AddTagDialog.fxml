@@ -104,7 +104,6 @@
                     <TextField fx:id="copyIdField" HBox.hgrow="ALWAYS"/>
                     <Button fx:id="copyButton"/>
                 </HBox>
-                <Label fx:id="copyStatusLabel" style="-fx-font-size: 12px; -fx-font-style: italic;"/>
             </VBox>
 
             <Region HBox.hgrow="ALWAYS" />
@@ -113,7 +112,7 @@
             <Button fx:id="okButton" onAction="#handleOk" defaultButton="true" HBox.hgrow="NEVER" text="Đồng ý"/>
         </children>
         <VBox.margin>
-            <Insets top="10.0"/>
+            <Insets top="5.0"/>
         </VBox.margin>
     </HBox>
 </VBox>
