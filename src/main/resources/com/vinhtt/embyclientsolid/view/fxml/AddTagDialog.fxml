@@ -52,7 +52,7 @@
             <VBox spacing="5.0">
                 <children>
                     <Label fx:id="suggestionKeyLabel" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-font-style: italic;"/>
-                    <ScrollPane fitToWidth="true" vbarPolicy="NEVER" hbarPolicy="AS_NEEDED" styleClass="scroll-pane" prefHeight="100.0">
+                    <ScrollPane fitToWidth="true" vbarPolicy="NEVER" hbarPolicy="AS_NEEDED" styleClass="scroll-pane" prefHeight="180.0">
                         <content>
                             <FlowPane fx:id="suggestionKeysPane" hgap="8.0" vgap="8.0">
                                 <padding>
@@ -66,7 +66,7 @@
             <VBox spacing="5.0">
                 <children>
                     <Label fx:id="suggestionValueLabel" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-font-style: italic;"/>
-                    <ScrollPane fitToWidth="true" vbarPolicy="NEVER" hbarPolicy="AS_NEEDED" styleClass="scroll-pane" prefHeight="100.0">
+                    <ScrollPane fitToWidth="true" vbarPolicy="NEVER" hbarPolicy="AS_NEEDED" styleClass="scroll-pane" prefHeight="180.0">
                         <content>
                             <FlowPane fx:id="suggestionValuesPane" hgap="8.0" vgap="8.0">
                                 <padding>
@@ -84,7 +84,7 @@
         <children>
             <Label fx:id="suggestionSimpleLabel" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-font-style: italic;"/>
             <ScrollPane fitToWidth="true" vbarPolicy="AS_NEEDED" hbarPolicy="NEVER" styleClass="scroll-pane"
-                        prefHeight="200.0" VBox.vgrow="ALWAYS">
+                        prefHeight="300.0" VBox.vgrow="ALWAYS">
                 <content>
                     <FlowPane fx:id="suggestionSimplePane" hgap="8.0" vgap="8.0">
                         <padding>

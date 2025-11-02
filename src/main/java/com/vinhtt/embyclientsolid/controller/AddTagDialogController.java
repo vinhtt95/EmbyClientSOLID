@@ -27,7 +27,7 @@ import java.util.Objects;
 
 /**
  * Controller cho AddTagDialog.fxml (View).
- * (Cập nhật: Sửa lỗi biên dịch 'isJson()' và thêm listener 'focus lost').
+ * (Cập nhật: Sửa lỗi NullPointer trên copyStatusLabel và lỗi 'isJson()').
  */
 public class AddTagDialogController {
 
@@ -124,6 +124,8 @@ public class AddTagDialogController {
         keyField.textProperty().bindBidirectional(viewModel.keyProperty());
         valueField.textProperty().bindBidirectional(viewModel.valueProperty());
         copyIdField.textProperty().bindBidirectional(viewModel.copyIdProperty());
+
+        // (SỬA LỖI 1: Dòng này giờ đã hợp lệ)
         copyStatusLabel.textProperty().bind(viewModel.copyStatusProperty());
 
         // --- Binding FlowPanes Gợi ý ---
@@ -170,7 +172,7 @@ public class AddTagDialogController {
             }
         });
 
-        // --- (SỬA LỖI: Thêm listener cho focus lost) ---
+        // --- Chuyển tiếp (Delegate) Sự kiện Mất Focus ---
         keyField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
             if (wasFocused && !isFocused) { // Focus Lost
                 viewModel.handleFocusLost("key");
@@ -244,15 +246,15 @@ public class AddTagDialogController {
             ToggleButton chip = new ToggleButton(item.getName());
             chip.getStyleClass().add("suggested-tag-button");
 
-            // (SỬA LỖI BIÊN DỊCH TẠI ĐÂY)
-            // Lỗi: item.isJson() không tồn tại.
-            // Sửa: Kiểm tra type. Mặc dù chúng đều là "simple",
-            // chúng ta có thể thêm style "tag-view-simple" cho Tag và Genre (giống project cũ).
+            // (SỬA LỖI 2: Xóa 'item.isJson()' và đơn giản hóa logic)
+            // Vì đây là populateSimpleSuggestions, chúng luôn là 'simple'.
+            // Chúng ta chỉ cần áp dụng style 'tag-view-simple' (màu hồng)
+            // cho các context nhất định, giống project cũ.
             String type = item.getType();
             if (Objects.equals(type, "GENRE") || Objects.equals(type, "TAG")) {
                 chip.getStyleClass().add("tag-view-simple");
             }
-            // (Không cần check JSON vì VM đã lọc ra rồi)
+            // (Context STUDIO và PEOPLE sẽ dùng style .suggested-tag-button mặc định)
 
             chip.setUserData(item);
             chip.setOnAction(e -> {

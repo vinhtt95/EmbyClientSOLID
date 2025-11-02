@@ -34,13 +34,12 @@ import java.net.URL;
 
 /**
  * Triển khai (Implementation) của IAppNavigator.
- * (Cập nhật GĐ 11: Tiêm IConfigurationService vào AddTagDialogController).
+ * (Cập nhật GĐ 11: Thêm logic lưu/khôi phục vị trí AddTagDialog).
  */
 public class AppNavigator implements IAppNavigator {
 
+    // ... (Các trường services giữ nguyên) ...
     private final Stage primaryStage;
-
-    // --- Services (DI từ MainApp) ---
     private final IEmbySessionService sessionService;
     private final IConfigurationService configService;
     private final IPreferenceService preferenceService;
@@ -50,6 +49,13 @@ public class AppNavigator implements IAppNavigator {
     private final IStaticDataRepository staticDataRepository;
     private final IItemUpdateService itemUpdateService;
     private final IExternalDataService externalDataService;
+
+    // (MỚI) Các hằng số để lưu vị trí dialog,
+    // (copy từ ItemDetailController.java cũ)
+    private static final String KEY_ADD_TAG_DIALOG_X = "addTagDialogX";
+    private static final String KEY_ADD_TAG_DIALOG_Y = "addTagDialogY";
+    private static final String KEY_ADD_TAG_DIALOG_WIDTH = "addTagDialogWidth";
+    private static final String KEY_ADD_TAG_DIALOG_HEIGHT = "addTagDialogHeight";
 
     private Stage detailDialog; // Cho UR-50
 
@@ -77,6 +83,8 @@ public class AppNavigator implements IAppNavigator {
         this.externalDataService = externalDataService;
     }
 
+    // ... (hàm initialize, showLogin, showMain giữ nguyên) ...
+
     @Override
     public void initialize(Stage stage) {
         // (Không cần, Stage đã được inject)
@@ -99,7 +107,7 @@ public class AppNavigator implements IAppNavigator {
     @Override
     public void showMain() {
         try {
-            // 1. Tạo MainViewModel (Điều phối chính)
+            // 1. Tạo MainViewModel
             MainViewModel mainViewModel = new MainViewModel(
                     sessionService,
                     this,
@@ -132,7 +140,7 @@ public class AppNavigator implements IAppNavigator {
                     configService
             );
 
-            // 3. Tạo MainController (View-Coordinator) và tiêm MỌI THỨ
+            // 3. Tạo MainController và tiêm
             MainController controller = new MainController(
                     mainViewModel,
                     libraryTreeViewModel,
@@ -144,7 +152,7 @@ public class AppNavigator implements IAppNavigator {
                     this // Tiêm IAppNavigator
             );
 
-            // 4. Tải FXML và tiêm Controller
+            // 4. Tải FXML
             loadScene("MainView.fxml", configService.getString("mainApp", "mainTitle"), controller, primaryStage, false);
 
         } catch (IOException e) {
@@ -161,14 +169,14 @@ public class AppNavigator implements IAppNavigator {
             URL fxmlUrl = MainApp.class.getResource("view/fxml/AddTagDialog.fxml");
             FXMLLoader loader = new FXMLLoader(fxmlUrl);
 
-            // 1. Tạo ViewModel cho dialog
+            // 1. Tạo ViewModel
             IAddTagViewModel viewModel = new AddTagViewModel(
                     staticDataRepository,
                     itemRepository
             );
             viewModel.setContext(context);
 
-            // 2. Tải FXML (Controller được FXML tự khởi tạo)
+            // 2. Tải FXML
             Parent root = loader.load();
             AddTagDialogController controller = loader.getController();
 
@@ -177,6 +185,35 @@ public class AppNavigator implements IAppNavigator {
             dialogStage.titleProperty().bind(viewModel.titleProperty());
             dialogStage.initModality(Modality.WINDOW_MODAL);
             dialogStage.initOwner(ownerStage);
+
+            // --- (MỚI) KHÔI PHỤC VỊ TRÍ/KÍCH THƯỚC (Logic từ ItemDetailController.java cũ) ---
+            double defaultWidth = 550.0;
+            double defaultHeight = 700.0;
+            double savedX = preferenceService.getDouble(KEY_ADD_TAG_DIALOG_X, -1);
+            double savedY = preferenceService.getDouble(KEY_ADD_TAG_DIALOG_Y, -1);
+            double savedWidth = preferenceService.getDouble(KEY_ADD_TAG_DIALOG_WIDTH, defaultWidth);
+            double savedHeight = preferenceService.getDouble(KEY_ADD_TAG_DIALOG_HEIGHT, defaultHeight);
+
+            if (savedX != -1 && savedY != -1) {
+                dialogStage.setX(savedX);
+                dialogStage.setY(savedY);
+            }
+            dialogStage.setWidth(savedWidth);
+            dialogStage.setHeight(savedHeight);
+
+            // --- (MỚI) LƯU VỊ TRÍ/KÍCH THƯỚC KHI ĐÓNG (Logic từ ItemDetailController.java cũ) ---
+            dialogStage.setOnCloseRequest(e -> {
+                try {
+                    preferenceService.putDouble(KEY_ADD_TAG_DIALOG_X, dialogStage.getX());
+                    preferenceService.putDouble(KEY_ADD_TAG_DIALOG_Y, dialogStage.getY());
+                    preferenceService.putDouble(KEY_ADD_TAG_DIALOG_WIDTH, dialogStage.getWidth());
+                    preferenceService.putDouble(KEY_ADD_TAG_DIALOG_HEIGHT, dialogStage.getHeight());
+                    preferenceService.flush();
+                } catch (Exception ex) {
+                    System.err.println("Lỗi khi lưu vị trí/kích thước AddTagDialog: " + ex.getMessage());
+                }
+            });
+            // --- KẾT THÚC THÊM MỚI ---
 
             Scene scene = new Scene(root);
             scene.getStylesheets().addAll(ownerStage.getScene().getStylesheets());
