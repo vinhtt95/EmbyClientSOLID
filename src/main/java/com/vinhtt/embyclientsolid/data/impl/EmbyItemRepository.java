@@ -18,8 +18,9 @@ import java.util.List;
 /**
  * Triển khai (Implementation) của IItemRepository.
  * Phụ thuộc vào IEmbySessionService để lấy ApiClient.
- * Logic được chuyển từ ItemRepository.java
- * và RequestEmby.java cũ.
+ *
+ * (ĐÃ SỬA LỖI LOGIC: Tách biệt logic getItemsByParentId (cho Tree)
+ * khỏi getItemsPaginated (cho Grid) theo đúng yêu cầu.)
  */
 public class EmbyItemRepository implements IItemRepository {
 
@@ -36,8 +37,6 @@ public class EmbyItemRepository implements IItemRepository {
     }
 
     // --- Helpers để lấy API services ---
-    // (Chúng ta tạo mới mỗi lần gọi, hoặc có thể cache chúng nếu muốn)
-
     private ItemsServiceApi getItemsService() {
         return new ItemsServiceApi(apiClient);
     }
@@ -57,7 +56,7 @@ public class EmbyItemRepository implements IItemRepository {
             throw new IllegalStateException("Chưa đăng nhập. Không thể lấy root views.");
         }
 
-        // Logic từ RequestEmby.getUsersByUseridItems
+        // Logic này đúng, lấy các thư mục gốc của User
         QueryResultBaseItemDto result = getItemsService().getUsersByUseridItems(userId, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         if (result != null && result.getItems() != null) {
@@ -66,22 +65,42 @@ public class EmbyItemRepository implements IItemRepository {
         return Collections.emptyList();
     }
 
+    /**
+     * (SỬA LỖI LOGIC TẠI ĐÂY)
+     * Lấy các items con dựa trên parentId (dùng cho Cột 1 - Tree).
+     * Hàm này KHÔNG đệ quy (recursive=null) và lấy TẤT CẢ các loại item
+     * (includeItemTypes=null) để ViewModel có thể lọc ra các thư mục.
+     * (UR-17).
+     *
+     * Logic này dựa trên RequestEmby.getQueryResultBaseItemDto từ dự án cũ.
+     */
     @Override
     public List<BaseItemDto> getItemsByParentId(String parentId) throws ApiException {
         // Logic từ RequestEmby.getQueryResultBaseItemDto
-        QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "Ascending", parentId, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "ProductionYear,PremiereDate,SortName", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null,null);
-
+        QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null,
+                null,
+                "Ascending",
+                parentId,
+                null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                "SortName",
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         if (result != null && result.getItems() != null) {
             return result.getItems();
         }
         return Collections.emptyList();
     }
 
+    /**
+     * Lấy các items con (dùng cho Cột 2 - Grid).
+     * Hàm này CÓ đệ quy (recursive=true) và chỉ lấy "Movie"
+     * (includeItemTypes="Movie").
+     */
     @Override
     public QueryResultBaseItemDto getItemsPaginated(String parentId, int startIndex, int limit, String sortOrder, String sortBy) throws ApiException {
         // Logic từ RequestEmby.getQueryResultFullBaseItemDto
         QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, true, null, sortOrder, parentId, "OfficialRating,CriticRating", null, "Movie", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, sortBy, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
-
         if (result != null) {
             return result;
         }
@@ -95,7 +114,15 @@ public class EmbyItemRepository implements IItemRepository {
     @Override
     public QueryResultBaseItemDto searchItemsPaginated(String keywords, int startIndex, int limit, String sortOrder, String sortBy) throws ApiException {
         // Logic từ RequestEmby.searchBaseItemDto
-        QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, true, keywords, sortOrder, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, sortBy, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                startIndex, // startIndex
+                limit, // limit
+                true, // recursive: true
+                keywords, // searchTerm
+                sortOrder, // sortOrder
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                sortBy, // sortBy
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         if (result != null) {
             return result;
@@ -121,7 +148,7 @@ public class EmbyItemRepository implements IItemRepository {
                 return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null).getItems();
             case "PEOPLE":
                 apiParam = chip.getId(); // People dùng ID
-                if (apiParam == null) throw new ApiException("People ID is null for: " + chip.getDisplayName());
+                if (apiParam == null) throw new ApiException("People ID is null for: ".concat(chip.getDisplayName()));
                 return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null,null).getItems();
             case "GENRE":
                 apiParam = chip.getDisplayName(); // Genre dùng tên hiển thị

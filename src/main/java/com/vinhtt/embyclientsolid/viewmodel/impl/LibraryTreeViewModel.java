@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
  * Triển khai (Implementation) của ILibraryTreeViewModel.
  * Logic được chuyển từ LibraryTreeViewModel.java cũ.
  * (UR-15, UR-16, UR-17).
+ *
+ * (ĐÃ SỬA LỖI: Thêm quản lý trạng thái loading cho loadChildrenForItem)
  */
 public class LibraryTreeViewModel implements ILibraryTreeViewModel {
 
@@ -85,6 +87,11 @@ public class LibraryTreeViewModel implements ILibraryTreeViewModel {
         }).start();
     }
 
+    /**
+     * (SỬA LỖI TẠI ĐÂY)
+     * Thêm logic `loading.set(true)` và `notificationService.showStatus`
+     * để quản lý trạng thái loading khi tải con.
+     */
     @Override
     public void loadChildrenForItem(TreeItem<LibraryTreeItem> item) {
         // Kiểm tra điều kiện (UR-17)
@@ -98,9 +105,19 @@ public class LibraryTreeViewModel implements ILibraryTreeViewModel {
 
         String parentId = item.getValue().getItemDto().getId();
 
+        // --- BẮT ĐẦU SỬA LỖI ---
+        // Báo cáo trạng thái loading TRƯỚC KHI chạy luồng
+        // (Chúng ta phải bọc trong Platform.runLater vì đây có thể được gọi từ một sự kiện UI)
+        Platform.runLater(() -> {
+            loading.set(true);
+            notificationService.showStatus("Đang tải: " + item.getValue().toString());
+        });
+        // --- KẾT THÚC SỬA LỖI ---
+
         new Thread(() -> {
             try {
                 List<BaseItemDto> allChildren = itemRepository.getItemsByParentId(parentId);
+                System.out.println(allChildren.size());
 
                 // Lọc chỉ FOLDER (UR-16)
                 List<BaseItemDto> folderChildren = allChildren.stream()
@@ -118,6 +135,12 @@ public class LibraryTreeViewModel implements ILibraryTreeViewModel {
                     }
                     // Tự động expand
                     item.setExpanded(true);
+
+                    // --- BẮT ĐẦU SỬA LỖI ---
+                    // Báo cáo đã tải xong
+                    loading.set(false);
+                    notificationService.clearStatus();
+                    // --- KẾT THÚC SỬA LỖI ---
                 });
 
             } catch (ApiException e) {
@@ -125,6 +148,12 @@ public class LibraryTreeViewModel implements ILibraryTreeViewModel {
                 Platform.runLater(() -> {
                     item.getChildren().clear(); // Xóa dummy node khi lỗi
                     item.setExpanded(false);
+
+                    // --- BẮT ĐẦU SỬA LỖI ---
+                    // Báo cáo lỗi
+                    loading.set(false);
+                    notificationService.showStatus("Lỗi tải cây con: " + e.getMessage());
+                    // --- KẾT THÚC SỬA LỖI ---
                 });
             }
         }).start();
