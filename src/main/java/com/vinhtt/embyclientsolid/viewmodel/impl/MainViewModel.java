@@ -8,12 +8,7 @@ import embyclient.model.AuthenticationAuthenticationResult;
 import embyclient.model.UserDto;
 import javafx.application.Platform;
 import javafx.beans.binding.BooleanBinding;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyStringProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 
 /**
  * ViewModel cho MainView (Giai đoạn 7).
@@ -38,10 +33,10 @@ public class MainViewModel {
     private final IAppNavigator appNavigator;
     private final IConfigurationService configService;
     private final INotificationService notificationService;
+    private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
     // --- Properties (Trạng thái UI) ---
     private final StringProperty statusMessage;
-    private final BooleanBinding loading;
     private final StringProperty searchKeyword = new SimpleStringProperty("");
 
     // (UR-21, UR-22)
@@ -70,11 +65,6 @@ public class MainViewModel {
         // Kết nối statusMessage với notificationService (UR-9)
         this.statusMessage = new SimpleStringProperty();
         this.statusMessage.bind(notificationService.statusMessageProperty());
-
-        // (Loading property sẽ được kết nối trong MainController)
-        this.loading = notificationService.statusMessageProperty().isNotEqualTo(
-                configService.getString("mainView", "statusReady")
-        );
     }
 
     /**
@@ -141,7 +131,7 @@ public class MainViewModel {
         return statusMessage;
     }
 
-    public BooleanBinding loadingProperty() {
+    public BooleanProperty loadingProperty() {
         return loading;
     }
 

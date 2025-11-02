@@ -162,6 +162,12 @@ public class MainController {
     private void bindCommonUI() {
         // Status Bar (UR-9)
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
+
+        BooleanBinding combinedLoading = libraryTreeViewModel.loadingProperty()
+                .or(itemGridViewModel.loadingProperty())
+                .or(itemDetailViewModel.loadingProperty());
+
+        viewModel.loadingProperty().bind(combinedLoading);
         statusProgressIndicator.visibleProperty().bind(viewModel.loadingProperty());
 
         // Toolbar Buttons (UR-5, UR-10)

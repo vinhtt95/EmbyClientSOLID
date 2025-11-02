@@ -39,7 +39,7 @@ import java.io.File;
 /**
  * Triển khai (Implementation) của IItemDetailViewModel (Cột 3).
  * (Cập nhật GĐ 10: Hoàn thiện Clone, Import/Export).
- * (Cập nhật GĐ 10.1: Sửa lỗi race condition của DirtyTracker).
+ * (Cập nhật GĐ 10.2: Sửa lỗi Rating (Bad Request) và Import (Save Button)).
  */
 public class ItemDetailViewModel implements IItemDetailViewModel {
 
@@ -368,8 +368,15 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     @Override
     public void saveCriticRatingImmediately(Float newRating) {
         if (originalItemDto == null || currentItemId == null) return;
-        BaseItemDto ratingDto = new BaseItemDto();
+
+        // --- SỬA LỖI (UR-33 / Bad Request) ---
+        // Tạo một bản clone đầy đủ của DTO, chỉ thay đổi rating
+        // Gửi một DTO mới trống rỗng sẽ gây ra lỗi 400 Bad Request
+        BaseItemDto ratingDto = gson.fromJson(gson.toJson(originalItemDto), BaseItemDto.class);
         ratingDto.setCriticRating(newRating);
+        // --- KẾT THÚC SỬA LỖI ---
+
+        loading.set(true);
         notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSavingRating"));
 
         new Thread(() -> {
@@ -381,11 +388,13 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                         originalItemDto.setCriticRating(newRating);
                     }
                     dirtyTracker.updateOriginalRating(newRating);
+                    loading.set(false);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     notificationService.showStatus(configService.getString("itemDetailViewModel", "errorSaveRating", e.getMessage()));
                     criticRating.set(originalItemDto.getCriticRating());
+                    loading.set(false);
                 });
             }
         }).start();

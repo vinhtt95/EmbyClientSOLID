@@ -118,7 +118,8 @@ public class ItemDetailDirtyTracker {
 
     private void addListeners() {
         viewModel.titleProperty().addListener(stringListener);
-        viewModel.criticRatingProperty().addListener(ratingListener);
+        // (SỬA LỖI: Không lắng nghe rating, vì nó tự lưu (UR-33))
+        // viewModel.criticRatingProperty().addListener(ratingListener);
         viewModel.overviewProperty().addListener(stringListener);
         viewModel.releaseDateProperty().addListener(stringListener);
         viewModel.originalTitleProperty().addListener(stringListener);
@@ -130,7 +131,7 @@ public class ItemDetailDirtyTracker {
 
     private void removeListeners() {
         viewModel.titleProperty().removeListener(stringListener);
-        viewModel.criticRatingProperty().removeListener(ratingListener);
+        // viewModel.criticRatingProperty().removeListener(ratingListener);
         viewModel.overviewProperty().removeListener(stringListener);
         viewModel.releaseDateProperty().removeListener(stringListener);
         viewModel.originalTitleProperty().removeListener(stringListener);
@@ -147,12 +148,6 @@ public class ItemDetailDirtyTracker {
     private void checkForChanges() {
         if (paused) return;
 
-        // Nếu đang trong quá trình import, nút Save (isDirty) luôn false
-        if (importAcceptancePending) {
-            isDirty.set(false);
-            return;
-        }
-
         if (originalTitle == null && originalTagItems == null) {
             isDirty.set(false); // Chưa start
             return;
@@ -163,13 +158,23 @@ public class ItemDetailDirtyTracker {
                 !Objects.equals(viewModel.releaseDateProperty().get(), originalReleaseDate) ||
                 !Objects.equals(viewModel.originalTitleProperty().get(), originalOriginalTitle);
 
-        boolean ratingChanges = !Objects.equals(viewModel.criticRatingProperty().get(), originalCriticRating);
-        boolean tagChanges = !Objects.equals(viewModel.getTagItems(), originalTagItems);
-        boolean studioChanges = !Objects.equals(viewModel.getStudioItems(), originalStudioItems);
-        boolean peopleChanges = !Objects.equals(viewModel.getPeopleItems(), originalPeopleItems);
-        boolean genreChanges = !Objects.equals(viewModel.getGenreItems(), originalGenreItems);
+        // (SỬA LỖI: UR-33 (Rating) không kích hoạt nút Save (UR-48))
+        boolean ratingChanges = false;
 
-        isDirty.set(stringChanges || ratingChanges || tagChanges || studioChanges || peopleChanges || genreChanges);
+        // (SỬA LỖI: So sánh nội dung List, không phải bản thân List)
+        boolean tagChanges = !Objects.equals(new ArrayList<>(viewModel.getTagItems()), originalTagItems);
+        boolean studioChanges = !Objects.equals(new ArrayList<>(viewModel.getStudioItems()), originalStudioItems);
+        boolean peopleChanges = !Objects.equals(new ArrayList<>(viewModel.getPeopleItems()), originalPeopleItems);
+        boolean genreChanges = !Objects.equals(new ArrayList<>(viewModel.getGenreItems()), originalGenreItems);
+
+        boolean changes = stringChanges || ratingChanges || tagChanges || studioChanges || peopleChanges || genreChanges;
+
+        // (SỬA LỖI (UR-48): Chuyển check này xuống cuối)
+        if (importAcceptancePending) {
+            isDirty.set(false);
+        } else {
+            isDirty.set(changes);
+        }
     }
 
     /**
@@ -180,12 +185,10 @@ public class ItemDetailDirtyTracker {
         if (paused) return;
 
         if (importAcceptancePending) {
-            // Đây là lần Accept (✓) đầu tiên
-            importAcceptancePending = false; // Thoát trạng thái chờ
-            isDirty.set(true); // Bật nút Save
+            importAcceptancePending = false;
+            isDirty.set(true);
         } else if (!isDirty.get()) {
-            // Đây là một thay đổi thủ công
-            isDirty.set(true); // Bật nút Save
+            isDirty.set(true);
         }
     }
 
@@ -202,8 +205,8 @@ public class ItemDetailDirtyTracker {
         this.originalStudioItems = new ArrayList<>(viewModel.getStudioItems());
         this.originalPeopleItems = new ArrayList<>(viewModel.getPeopleItems());
         this.originalGenreItems = new ArrayList<>(viewModel.getGenreItems());
-        importAcceptancePending = false; // Reset cờ
-        checkForChanges(); // Sẽ set isDirty về false
+        importAcceptancePending = false;
+        checkForChanges();
     }
 
     /**
@@ -213,9 +216,11 @@ public class ItemDetailDirtyTracker {
         if (paused) return;
         this.originalCriticRating = newRating;
         if (importAcceptancePending) {
+            // Nếu người dùng đang import VÀ nhấn nút rating,
+            // chúng ta coi như họ đã chấp nhận (UR-47)
             importAcceptancePending = false;
         }
-        checkForChanges(); // Kiểm tra lại
+        checkForChanges();
     }
 
     private void clearOriginals() {
