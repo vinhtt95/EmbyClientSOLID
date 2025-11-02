@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * Triển khai (Implementation) của IItemRepository.
  * Phụ thuộc vào IEmbySessionService để lấy ApiClient.
- *
+ * <p>
  * (ĐÃ SỬA LỖI LOGIC: Tách biệt logic getItemsByParentId (cho Tree)
  * khỏi getItemsPaginated (cho Grid) theo đúng yêu cầu.)
  */
@@ -29,6 +29,7 @@ public class EmbyItemRepository implements IItemRepository {
 
     /**
      * Khởi tạo Repository với Session Service.
+     *
      * @param sessionService Service đã được tiêm (DI).
      */
     public EmbyItemRepository(IEmbySessionService sessionService) {
@@ -71,7 +72,7 @@ public class EmbyItemRepository implements IItemRepository {
      * Hàm này KHÔNG đệ quy (recursive=null) và lấy TẤT CẢ các loại item
      * (includeItemTypes=null) để ViewModel có thể lọc ra các thư mục.
      * (UR-17).
-     *
+     * <p>
      * Logic này dựa trên RequestEmby.getQueryResultBaseItemDto từ dự án cũ.
      */
     @Override
@@ -134,8 +135,8 @@ public class EmbyItemRepository implements IItemRepository {
     }
 
     @Override
-    public List<BaseItemDto> getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive) throws ApiException {
-        System.out.println(chip.toString() +"Type: "+ chipType.toString());
+    public QueryResultBaseItemDto getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive, String sortOrder, String sortBy) throws ApiException {
+        System.out.println(chip.toString() + "Type: " + chipType.toString());
         // --- LOGIC MỚI (LẦN 5) - Sửa lại Studio theo yêu cầu của ông ---
         String apiParam;
         QueryResultBaseItemDto listItems = null;
@@ -183,7 +184,7 @@ public class EmbyItemRepository implements IItemRepository {
                             limit,    //limit
                             recursive,    //recursive
                             null,    //searchTerm
-                            "Ascending",    //sortOrder
+                            sortOrder,    //sortOrder
                             null,    //parentId
                             null,    //fields
                             null,    //excludeItemTypes
@@ -204,7 +205,7 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //projectToMedia
                             null,    //mediaTypes
                             null,    //imageTypes
-                            null,    //sortBy
+                            sortBy,    //sortBy
                             null,    //isPlayed
                             null,    //genres
                             null,    //officialRatings
@@ -252,19 +253,19 @@ public class EmbyItemRepository implements IItemRepository {
 
                     if (!listItems.getItems().isEmpty()) {
 
-                        return listItems.getItems();
+                        return listItems;
                     }
 
                 } catch (ApiException e) {
                     System.out.println("Error fetching tags: " + e.getMessage());
                 }
-                return Collections.emptyList();
+                break;
 
             case "STUDIO":
                 String studioId;
                 studioId = chip.getId(); // Studio dùng TÊN (hoặc JSON string)
                 if (studioId == null) throw new ApiException("Studio Name is null for: " + chip.getDisplayName());
-                System.out.println("studioId: "+ studioId);
+                System.out.println("studioId: " + studioId);
                 try {
                     listItems = getItemsService().getItems(
                             null,    //artistType
@@ -304,7 +305,7 @@ public class EmbyItemRepository implements IItemRepository {
                             limit,    //limit
                             recursive,    //recursive
                             null,    //searchTerm
-                            "Ascending",    //sortOrder
+                            sortOrder,    //sortOrder
                             null,    //parentId
                             null,    //fields
                             null,    //excludeItemTypes
@@ -325,7 +326,7 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //projectToMedia
                             null,    //mediaTypes
                             null,    //imageTypes
-                            null,    //sortBy
+                            sortBy,    //sortBy
                             null,    //isPlayed
                             null,    //genres
                             null,    //officialRatings
@@ -374,18 +375,18 @@ public class EmbyItemRepository implements IItemRepository {
 
                     if (!listItems.getItems().isEmpty()) {
 
-                        return listItems.getItems();
+                        return listItems;
                     }
 
                 } catch (ApiException e) {
                     System.out.println("Error fetching studios: " + e.getMessage());
                 }
-                return Collections.emptyList();
+                break;
             case "PEOPLE":
                 apiParam = chip.getId(); // People dùng ID
                 if (apiParam == null) throw new ApiException("People ID is null for: ".concat(chip.getDisplayName()));
                 String peopleID = chip.getId(); // Genre dùng tên hiển thị
-                try{
+                try {
                     listItems = getItemsService().getItems(
                             null,    //artistType
                             null,    //maxOfficialRating
@@ -424,7 +425,7 @@ public class EmbyItemRepository implements IItemRepository {
                             limit,    //limit
                             recursive,    //recursive
                             null,    //searchTerm
-                            "Ascending",    //sortOrder
+                            sortOrder,    //sortOrder
                             null,    //parentId
                             null,    //fields
                             null,    //excludeItemTypes
@@ -445,7 +446,7 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //projectToMedia
                             null,    //mediaTypes
                             null,    //imageTypes
-                            null,    //sortBy
+                            sortBy,    //sortBy
                             null,    //isPlayed
                             null,    //genres
                             null,    //officialRatings
@@ -494,12 +495,12 @@ public class EmbyItemRepository implements IItemRepository {
 
                     if (!listItems.getItems().isEmpty()) {
 
-                        return listItems.getItems();
+                        return listItems;
                     }
                 } catch (ApiException e) {
                     System.out.println("Error fetching people: " + e.getMessage());
                 }
-                return Collections.emptyList();
+                break;
 
             case "GENRE":
                 String nameGenres = chip.serialize(); // Genre dùng tên hiển thị
@@ -543,7 +544,7 @@ public class EmbyItemRepository implements IItemRepository {
                             limit,    //limit
                             recursive,    //recursive
                             null,    //searchTerm
-                            null,    //sortOrder
+                            sortOrder,    //sortOrder
                             null,    //parentId
                             null,    //fields
                             null,    //excludeItemTypes
@@ -564,7 +565,7 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //projectToMedia
                             null,    //mediaTypes
                             null,    //imageTypes
-                            null,    //sortBy
+                            sortBy,    //sortBy
                             null,    //isPlayed
                             nameGenres,    //genres
                             null,    //officialRatings
@@ -612,17 +613,21 @@ public class EmbyItemRepository implements IItemRepository {
 
                     if (!listItems.getItems().isEmpty()) {
 
-                        return listItems.getItems();
+                        return listItems;
                     }
                 } catch (ApiException e) {
                     System.out.println("Error fetching Genres: " + e.getMessage());
                 }
-                return Collections.emptyList();
-
-            default:
-                return Collections.emptyList();
+                break;
         }
+
+        QueryResultBaseItemDto emptyResult = new QueryResultBaseItemDto();
+        emptyResult.setItems(Collections.emptyList());
+        emptyResult.setTotalRecordCount(0);
+        return emptyResult;
+
     }
+
 
     @Override
     public BaseItemDto getFullItemDetails(String itemId) throws ApiException {

@@ -66,10 +66,12 @@ public interface IItemRepository {
      * @param startIndex Vị trí bắt đầu.
      * @param limit Số lượng.
      * @param recursive Đệ quy.
-     * @return Danh sách BaseItemDto.
+     * @param sortOrder Thứ tự sắp xếp ("Ascending" hoặc "Descending").
+     * @param sortBy Tiêu chí sắp xếp (ví dụ: "SortName").
+     * @return QueryResultBaseItemDto chứa danh sách items và tổng số.
      * @throws ApiException Nếu API call thất bại.
      */
-    List<BaseItemDto> getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive) throws ApiException;
+    QueryResultBaseItemDto getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive,String sortOrder, String sortBy) throws ApiException;
 
     /**
      * Lấy thông tin chi tiết đầy đủ của một item.

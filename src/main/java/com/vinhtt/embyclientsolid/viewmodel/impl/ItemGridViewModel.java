@@ -198,7 +198,16 @@ public class ItemGridViewModel implements IItemGridViewModel {
         if (!this.currentSortBy.equals(sortBy)) {
             this.currentSortBy = sortBy;
             // Tải lại trang đầu tiên với sắp xếp mới
-            loadItemsByParentId(this.currentPrimaryParam);
+            if (currentStateType == GridNavigationState.StateType.CHIP) {
+                // Gọi loadItemsByChipInternal nếu đang ở trạng thái CHIP
+                loadItemsByChip(this.currentChipModel, this.currentChipType);
+            } else if (currentStateType == GridNavigationState.StateType.SEARCH) {
+                // Gọi loadSearchPageInternal nếu đang ở trạng thái SEARCH
+                searchItems(this.currentPrimaryParam);
+            } else {
+                // Mặc định là FOLDER
+                loadItemsByParentId(this.currentPrimaryParam);
+            }
         }
     }
 
@@ -207,7 +216,13 @@ public class ItemGridViewModel implements IItemGridViewModel {
         if (!this.currentSortOrder.equals(sortOrder)) {
             this.currentSortOrder = sortOrder;
             // Tải lại trang đầu tiên với sắp xếp mới
-            loadItemsByParentId(this.currentPrimaryParam);
+            if (currentStateType == GridNavigationState.StateType.CHIP) {
+                loadItemsByChip(this.currentChipModel, this.currentChipType);
+            } else if (currentStateType == GridNavigationState.StateType.SEARCH) {
+                searchItems(this.currentPrimaryParam);
+            } else {
+                loadItemsByParentId(this.currentPrimaryParam);
+            }
         }
     }
 
@@ -240,6 +255,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
 
             if (currentStateType == GridNavigationState.StateType.SEARCH) {
                 loadSearchPageInternal(nextPage, currentPrimaryParam, null);
+            } else if (currentStateType == GridNavigationState.StateType.CHIP) {
+                loadItemsByChipInternal(nextPage, currentChipModel, currentChipType, null); // THÊM
             } else {
                 loadPageInternal(nextPage, currentPrimaryParam, null);
             }
@@ -254,6 +271,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
 
             if (currentStateType == GridNavigationState.StateType.SEARCH) {
                 loadSearchPageInternal(prevPage, currentPrimaryParam, null);
+            } else if (currentStateType == GridNavigationState.StateType.CHIP) {
+                loadItemsByChipInternal(prevPage, currentChipModel, currentChipType, null); // THÊM
             } else {
                 loadPageInternal(prevPage, currentPrimaryParam, null);
             }
@@ -333,17 +352,26 @@ public class ItemGridViewModel implements IItemGridViewModel {
     private void loadItemsByChipInternal(int pageIndex, Tag chip, String chipType, String itemIdToSelect) {
         loading.set(true);
         showStatusMessage.set(true);
-        // --- SỬA LỖI 2: Gọi global status ---
         notificationService.showStatus("Đang tải theo chip...");
 
         new Thread(() -> {
             try {
                 // (Giả định API trả về tất cả, không phân trang)
-                List<BaseItemDto> chipItems = itemRepository.getItemsByChip(chip, chipType, 0, 50, true);
+//                List<BaseItemDto> chipItems = itemRepository.getItemsByChip(chip, chipType, 0, 50, true);
 
-                QueryResultBaseItemDto result = new QueryResultBaseItemDto();
+                /*QueryResultBaseItemDto result = new QueryResultBaseItemDto();
                 result.setItems(chipItems);
-                result.setTotalRecordCount(chipItems.size());
+                result.setTotalRecordCount(chipItems.size());*/
+
+                QueryResultBaseItemDto result = itemRepository.getItemsByChip(
+                        chip,
+                        chipType,
+                        (pageIndex * ITEMS_PER_LOAD),
+                        ITEMS_PER_LOAD,
+                        true,
+                        currentSortOrder,
+                        currentSortBy
+                );
 
                 Platform.runLater(() -> {
                     if (!isRestoringState) {
@@ -352,8 +380,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
                         currentChipModel = chip;
                         currentChipType = chipType;
                     }
-                    updateStateFromQueryResult(result, 0, itemIdToSelect); // Luôn là trang 0
-                    // --- SỬA LỖI 2: Clear global status ---
+                    updateStateFromQueryResult(result, pageIndex, itemIdToSelect);
                     notificationService.clearStatus();
                 });
 
