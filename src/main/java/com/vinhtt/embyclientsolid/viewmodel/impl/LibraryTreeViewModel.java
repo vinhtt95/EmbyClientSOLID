@@ -117,7 +117,6 @@ public class LibraryTreeViewModel implements ILibraryTreeViewModel {
         new Thread(() -> {
             try {
                 List<BaseItemDto> allChildren = itemRepository.getItemsByParentId(parentId);
-                System.out.println(allChildren.size());
 
                 // Lọc chỉ FOLDER (UR-16)
                 List<BaseItemDto> folderChildren = allChildren.stream()
