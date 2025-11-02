@@ -9,7 +9,7 @@
 - [x] Giai đoạn 7: Màn hình Chính (Main View + ViewModel)
 - [x] Giai đoạn 8: Cột Thư viện (Tree View + VM)
 - [x] Giai đoạn 9: Cột Lưới Item (Grid View + VM)
-- [ ] Giai đoạn 10: Cột Chi tiết (Detail View + VM)
+- [x] Giai đoạn 10: Cột Chi tiết (Detail View + VM)
 - [ ] Giai đoạn 11: Dialog Thêm Tag (Dialog + VM)
 - [ ] Giai đoạn 12: Hoàn thiện Phím tắt & Pop-out
 - [ ] Giai đoạn 13: Hoàn thiện (Styling & I18n)
