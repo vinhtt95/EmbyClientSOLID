@@ -1,6 +1,8 @@
 package com.vinhtt.embyclientsolid.core;
 
+import com.vinhtt.embyclientsolid.model.SuggestionContext;
 import com.vinhtt.embyclientsolid.model.Tag;
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult;
 import javafx.stage.Stage;
 
 /**
@@ -31,12 +33,13 @@ public interface IAppNavigator {
 
     /**
      * Hiển thị dialog "Add Tag" (UR-35).
+     * (Cập nhật GĐ 11).
      *
      * @param ownerStage Stage sở hữu (để khóa).
-     * @return Đối tượng Tag mới được tạo, hoặc null nếu người dùng hủy.
-     * (Kiểu trả về sẽ được hoàn thiện ở Giai đoạn 11).
+     * @param context    Loại chip đang thêm (TAG, STUDIO, v.v.).
+     * @return Đối tượng AddTagResult chứa Tag mới hoặc CopyId, hoặc null nếu hủy.
      */
-    Tag showAddTagDialog(Stage ownerStage);
+    AddTagResult showAddTagDialog(Stage ownerStage, SuggestionContext context);
 
     /**
      * Hiển thị cửa sổ chi tiết "pop-out" (UR-50).

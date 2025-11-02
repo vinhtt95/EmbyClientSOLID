@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 /**
  * Model POJO đơn giản hóa cho các đối tượng gợi ý như Genre, Studio, People.
- * Được chuyển đổi từ 'SuggestionItemModel' cũ.
+ * (Cập nhật: Thêm constructor (String, String, String) để sửa lỗi biên dịch).
  */
 public class SuggestionItem {
 
@@ -30,6 +30,23 @@ public class SuggestionItem {
         this.imageTags = dto.getImageTags() != null ? dto.getImageTags() : Collections.emptyMap();
         this.backdropImageTags = dto.getBackdropImageTags() != null ? dto.getBackdropImageTags() : Collections.emptyList();
     }
+
+    /**
+     * (MỚI) Khởi tạo từ các giá trị thô.
+     * Dùng để tạo SuggestionItem từ một đối tượng Tag (không phải BaseItemDto).
+     *
+     * @param name Tên hiển thị.
+     * @param id ID (có thể null).
+     * @param type Loại (ví dụ: "Tag").
+     */
+    public SuggestionItem(String name, String id, String type) {
+        this.name = name;
+        this.id = id;
+        this.type = type;
+        this.imageTags = Collections.emptyMap(); // Không có thông tin ảnh khi tạo từ Tag
+        this.backdropImageTags = Collections.emptyList();
+    }
+
 
     /**
      * Chuyển đổi một danh sách DTOs thành danh sách SuggestionItems.
@@ -60,12 +77,11 @@ public class SuggestionItem {
         if (o == null || getClass() != o.getClass()) return false;
         SuggestionItem that = (SuggestionItem) o;
         return Objects.equals(id, that.id) &&
-                Objects.equals(name, that.name) &&
-                Objects.equals(type, that.type);
+                Objects.equals(name, that.name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, type);
+        return Objects.hash(id, name);
     }
 }

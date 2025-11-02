@@ -1,9 +1,12 @@
 package com.vinhtt.embyclientsolid.controller;
 
 import com.vinhtt.embyclientsolid.MainApp;
+import com.vinhtt.embyclientsolid.core.IAppNavigator; // (MỚI)
 import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import com.vinhtt.embyclientsolid.core.INotificationService;
 import com.vinhtt.embyclientsolid.core.IPreferenceService;
+import com.vinhtt.embyclientsolid.model.SuggestionContext; // (MỚI)
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult; // (MỚI)
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
@@ -11,7 +14,7 @@ import com.vinhtt.embyclientsolid.viewmodel.impl.MainViewModel;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
-import javafx.beans.property.BooleanProperty; // <-- SỬA LỖI 4: Thêm import
+import javafx.beans.property.BooleanProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -23,13 +26,14 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
+import javafx.stage.Stage; // (MỚI)
 
 import java.io.IOException;
 import java.net.URL;
 
 /**
  * Controller cho MainView.fxml (Giai đoạn 7).
- * (Đã sửa lỗi tiêm VM và logic lấy ID).
+ * (Cập nhật GĐ 11: Nhận IAppNavigator, xử lý sự kiện AddTag).
  */
 public class MainController {
 
@@ -55,7 +59,8 @@ public class MainController {
     private final IItemDetailViewModel itemDetailViewModel;
     private final IConfigurationService configService;
     private final IPreferenceService preferenceService;
-    private final INotificationService notificationService; // <-- SỬA LỖI 2: Thêm service
+    private final INotificationService notificationService;
+    private final IAppNavigator appNavigator; // (MỚI - GĐ 11)
 
     // --- Sub-Controllers ---
     private LibraryTreeController libraryTreeController;
@@ -68,7 +73,7 @@ public class MainController {
 
     /**
      * Khởi tạo MainController với tất cả các dependencies.
-     * (SỬA LỖI 2: Nhận INotificationService).
+     * (SỬA ĐỔI GĐ 11: Nhận IAppNavigator).
      */
     public MainController(
             MainViewModel viewModel,
@@ -77,7 +82,8 @@ public class MainController {
             IItemDetailViewModel itemDetailViewModel,
             IConfigurationService configService,
             IPreferenceService preferenceService,
-            INotificationService notificationService // <-- SỬA LỖI 2: Thêm tham số
+            INotificationService notificationService,
+            IAppNavigator appNavigator // (MỚI - GĐ 11)
     ) {
         this.viewModel = viewModel;
         this.libraryTreeViewModel = libraryTreeViewModel;
@@ -85,7 +91,8 @@ public class MainController {
         this.itemDetailViewModel = itemDetailViewModel;
         this.configService = configService;
         this.preferenceService = preferenceService;
-        this.notificationService = notificationService; // <-- SỬA LỖI 2: Lưu service
+        this.notificationService = notificationService;
+        this.appNavigator = appNavigator; // (MỚI - GĐ 11)
     }
 
     @FXML
@@ -114,10 +121,7 @@ public class MainController {
         Platform.runLater(this::handleHomeButtonAction);
     }
 
-    /**
-     * Cài đặt các chuỗi văn bản (I18n).
-     * (UR-11)
-     */
+    // ... (Hàm setupLocalization không đổi) ...
     private void setupLocalization() {
         homeButton.setText(configService.getString("mainView", "homeButton"));
         logoutButton.setText(configService.getString("mainView", "logoutButton"));
@@ -125,27 +129,21 @@ public class MainController {
         searchButton.setText(configService.getString("mainView", "searchButton"));
     }
 
-    /**
-     * Tải FXML cho 3 cột và tiêm ViewModel cho chúng.
-     * (SỬA LỖI 1 & 2: Truyền services vào setViewModel).
-     */
+    // ... (Hàm loadSubViews không đổi) ...
     private void loadSubViews() {
         try {
             libraryTreeController = loadNestedFXML("LibraryTreeView.fxml", leftPaneContainer);
             if (libraryTreeController != null) {
-                // Tiêm ViewModel cho Cột 1
                 libraryTreeController.setViewModel(libraryTreeViewModel);
             }
 
             itemGridController = loadNestedFXML("ItemGridView.fxml", centerPaneContainer);
             if (itemGridController != null) {
-                // Tiêm ViewModel cho Cột 2 (SỬA LỖI 1)
                 itemGridController.setViewModel(itemGridViewModel, notificationService, configService);
             }
 
             itemDetailController = loadNestedFXML("ItemDetailView.fxml", rightPaneContainer);
             if (itemDetailController != null) {
-                // Tiêm ViewModel cho Cột 3 (SỬA LỖI 2)
                 itemDetailController.setViewModel(itemDetailViewModel, configService);
             }
 
@@ -155,91 +153,90 @@ public class MainController {
         }
     }
 
-    /**
-     * Binding các nút Toolbar và Statusbar vào MainViewModel.
-     * (UR-5, UR-9, UR-10, UR-20, UR-21, UR-22).
-     */
+    // ... (Hàm bindCommonUI không đổi) ...
     private void bindCommonUI() {
-        // Status Bar (UR-9)
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
-
         BooleanBinding combinedLoading = libraryTreeViewModel.loadingProperty()
                 .or(itemGridViewModel.loadingProperty())
                 .or(itemDetailViewModel.loadingProperty());
-
         viewModel.loadingProperty().bind(combinedLoading);
         statusProgressIndicator.visibleProperty().bind(viewModel.loadingProperty());
-
-        // Toolbar Buttons (UR-5, UR-10)
         homeButton.setOnAction(e -> handleHomeButtonAction());
         logoutButton.setOnAction(e -> viewModel.logoutCommand());
-
-        // Search (UR-20)
         searchField.textProperty().bindBidirectional(viewModel.searchKeywordProperty());
         searchButton.setOnAction(e -> viewModel.searchCommand(searchField.getText()));
         searchField.setOnAction(e -> viewModel.searchCommand(searchField.getText()));
-
-        // Sorting (UR-21, UR-22)
         bindSortingButtons();
         sortByButton.setOnAction(e -> viewModel.toggleSortByCommand());
         sortOrderButton.setOnAction(e -> viewModel.toggleSortOrderCommand());
     }
 
     /**
-     * Thiết lập luồng dữ liệu giữa các ViewModel con.
-     * (SỬA LỖI 3: Sửa logic lấy ID).
+     * (SỬA ĐỔI GĐ 11: Thêm listener cho addChipCommandProperty).
      */
     private void setupViewModelCoordination() {
 
-        // 1. Khi Cây (Cột 1) chọn 1 item -> Cột 2 tải item đó
+        // 1. Cây -> Lưới
         libraryTreeViewModel.selectedTreeItemProperty().addListener((obs, oldVal, newVal) -> {
-            // SỬA LỖI 3: Kiểm tra dummy node và gọi getItemDto()
             if (newVal != null && newVal.getValue() != null && !newVal.getValue().isLoadingNode()) {
                 String parentId = newVal.getValue().getItemDto().getId();
-                searchField.setText(""); // Xóa tìm kiếm
+                searchField.setText("");
                 itemGridViewModel.loadItemsByParentId(parentId);
             }
-            // (Nếu newVal là null, nút Home đã xử lý)
         });
 
-        // 2. Khi Lưới (Cột 2) chọn 1 item -> Cột 3 tải chi tiết item đó
+        // 2. Lưới -> Chi tiết
         itemGridViewModel.selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             itemDetailViewModel.loadItem(newVal);
         });
 
-        // 3. Khi MainVM yêu cầu tìm kiếm -> Cột 2 tải kết quả tìm kiếm
+        // 3. MainVM (Tìm kiếm) -> Lưới
         viewModel.searchKeywordProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.isEmpty()) {
                 if (libraryTreeController != null) {
-                    libraryTreeController.clearSelection(); // Bỏ chọn cây
+                    libraryTreeController.clearSelection();
                 }
                 itemGridViewModel.searchItems(newVal);
             }
         });
 
-        // 4. Khi MainVM thay đổi sắp xếp -> Cột 2 tải lại với sắp xếp mới
+        // 4. MainVM (Sắp xếp) -> Lưới
         viewModel.sortByProperty().addListener((obs, oldVal, newVal) -> itemGridViewModel.setSortBy(newVal));
         viewModel.sortOrderProperty().addListener((obs, oldVal, newVal) -> itemGridViewModel.setSortOrder(newVal));
 
-        // 5. Khi Cột 3 click vào chip (UR-36) -> Cột 2 tải theo chip
+        // 5. Chi tiết (Click Chip) -> Lưới
         itemDetailViewModel.chipClickEventProperty().addListener((obs, oldEvent, newEvent) -> {
             if (newEvent != null) {
                 if (libraryTreeController != null) {
-                    libraryTreeController.clearSelection(); // Bỏ chọn cây
+                    libraryTreeController.clearSelection();
                 }
-                searchField.setText(""); // Xóa tìm kiếm
-
+                searchField.setText("");
                 itemGridViewModel.loadItemsByChip(newEvent.model, newEvent.type);
+                itemDetailViewModel.clearChipClickEvent();
+            }
+        });
 
-                itemDetailViewModel.clearChipClickEvent(); // Tiêu thụ sự kiện
+        // 6. (MỚI - GĐ 11) Chi tiết (Add Chip) -> MainController -> AppNavigator
+        itemDetailViewModel.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
+            if (newCtx != null) {
+                // Lấy Stage hiện tại từ rootPane
+                Stage ownerStage = (Stage) rootPane.getScene().getWindow();
+
+                // Gọi AppNavigator để hiển thị dialog
+                AddTagResult result = appNavigator.showAddTagDialog(ownerStage, newCtx);
+
+                // Gửi kết quả (hoặc null) trở lại ViewModel
+                if (result != null) {
+                    itemDetailViewModel.processAddTagResult(result, newCtx);
+                }
+
+                // Báo cho ViewModel là sự kiện đã được xử lý
+                itemDetailViewModel.clearAddChipCommand();
             }
         });
     }
 
-    /**
-     * Xử lý khi nhấn nút Home.
-     * (UR-10)
-     */
+    // ... (Hàm handleHomeButtonAction không đổi) ...
     @FXML
     private void handleHomeButtonAction() {
         if (libraryTreeController != null) {
@@ -249,33 +246,23 @@ public class MainController {
         itemGridViewModel.loadItemsByParentId(null); // Tải gốc
     }
 
-    /**
-     * Helper tải FXML con vào AnchorPane.
-     */
+    // ... (Hàm loadNestedFXML không đổi) ...
     private <T> T loadNestedFXML(String fxmlFile, AnchorPane container) throws IOException {
         URL fxmlUrl = MainApp.class.getResource("view/fxml/" + fxmlFile);
         if (fxmlUrl == null) {
             throw new IOException("Không tìm thấy FXML: " + fxmlFile);
         }
-
         FXMLLoader loader = new FXMLLoader(fxmlUrl);
-        // Controller sẽ được tạo tự động bởi FXML (vì chúng ta không
-        // inject controller factory vào AppNavigator)
         Node node = loader.load();
-
         AnchorPane.setTopAnchor(node, 0.0);
         AnchorPane.setBottomAnchor(node, 0.0);
         AnchorPane.setLeftAnchor(node, 0.0);
         AnchorPane.setRightAnchor(node, 0.0);
-
         container.getChildren().add(node);
         return loader.getController();
     }
 
-    /**
-     * Binding logic cho các nút sắp xếp.
-     * (UR-21, UR-22).
-     */
+    // ... (Hàm bindSortingButtons không đổi) ...
     private void bindSortingButtons() {
         sortByButton.textProperty().bind(
                 Bindings.createStringBinding(() -> {
@@ -308,8 +295,6 @@ public class MainController {
             sortOrderButton.setSelected(MainViewModel.SORT_ORDER_ASCENDING.equals(newVal));
         });
 
-        // Vô hiệu hóa nút khi đang tìm kiếm (UR-20)
-        // SỬA LỖI 4: Thêm import cho BooleanProperty
         BooleanBinding isSearching = Bindings.createBooleanBinding(
                 () -> !viewModel.searchKeywordProperty().get().isEmpty(),
                 viewModel.searchKeywordProperty()
@@ -318,10 +303,7 @@ public class MainController {
         sortOrderButton.disableProperty().bind(isSearching);
     }
 
-    /**
-     * Lưu vị trí thanh chia.
-     * (UR-8)
-     */
+    // ... (Hàm save/loadDividerPositions không đổi) ...
     private void saveDividerPositions() {
         if (mainSplitPane != null && preferenceService != null && mainSplitPane.getDividers().size() >= 2) {
             double[] positions = mainSplitPane.getDividerPositions();
@@ -330,18 +312,12 @@ public class MainController {
             preferenceService.flush();
         }
     }
-
-    /**
-     * Tải vị trí thanh chia.
-     * (UR-8)
-     */
     private void loadDividerPositions() {
         if (mainSplitPane != null && preferenceService != null && mainSplitPane.getDividers().size() >= 2) {
-            double pos1 = preferenceService.getDouble(KEY_DIVIDER_1, 0.20); // Cột 1 nhỏ hơn
-            double pos2 = preferenceService.getDouble(KEY_DIVIDER_2, 0.60); // Cột 2 lớn hơn
+            double pos1 = preferenceService.getDouble(KEY_DIVIDER_1, 0.20);
+            double pos2 = preferenceService.getDouble(KEY_DIVIDER_2, 0.60);
             Platform.runLater(() -> {
                 mainSplitPane.setDividerPositions(pos1, pos2);
-                // Thêm listener để lưu khi thay đổi (UR-8)
                 mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, o, n) -> saveDividerPositions());
                 mainSplitPane.getDividers().get(1).positionProperty().addListener((obs, o, n) -> saveDividerPositions());
             });

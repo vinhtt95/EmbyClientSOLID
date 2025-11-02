@@ -1,6 +1,7 @@
 package com.vinhtt.embyclientsolid.navigation;
 
 import com.vinhtt.embyclientsolid.MainApp;
+import com.vinhtt.embyclientsolid.controller.AddTagDialogController; // (MỚI)
 import com.vinhtt.embyclientsolid.core.*;
 import com.vinhtt.embyclientsolid.controller.LoginController;
 import com.vinhtt.embyclientsolid.controller.MainController;
@@ -8,11 +9,15 @@ import com.vinhtt.embyclientsolid.data.IExternalDataService;
 import com.vinhtt.embyclientsolid.data.IItemRepository;
 import com.vinhtt.embyclientsolid.data.IItemUpdateService;
 import com.vinhtt.embyclientsolid.data.IStaticDataRepository;
+import com.vinhtt.embyclientsolid.model.SuggestionContext; // (MỚI)
 import com.vinhtt.embyclientsolid.model.Tag;
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult; // (MỚI)
+import com.vinhtt.embyclientsolid.viewmodel.IAddTagViewModel; // (MỚI)
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILoginViewModel;
+import com.vinhtt.embyclientsolid.viewmodel.impl.AddTagViewModel; // (MỚI)
 import com.vinhtt.embyclientsolid.viewmodel.impl.ItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.impl.ItemGridViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.impl.LibraryTreeViewModel;
@@ -21,6 +26,7 @@ import com.vinhtt.embyclientsolid.viewmodel.impl.MainViewModel;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.stage.Modality; // (MỚI)
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -28,7 +34,7 @@ import java.net.URL;
 
 /**
  * Triển khai (Implementation) của IAppNavigator.
- * (Cập nhật Giai đoạn 10: Tiêm LibraryTreeViewModel vào ItemDetailViewModel).
+ * (Cập nhật Giai đoạn 11: Triển khai showAddTagDialog).
  */
 public class AppNavigator implements IAppNavigator {
 
@@ -84,7 +90,7 @@ public class AppNavigator implements IAppNavigator {
                 if (newVal) showMain();
             });
             LoginController controller = new LoginController(viewModel, configService);
-            loadScene("LoginView.fxml", configService.getString("mainApp", "loginTitle"), controller, primaryStage);
+            loadScene("LoginView.fxml", configService.getString("mainApp", "loginTitle"), controller, primaryStage, false);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -114,7 +120,6 @@ public class AppNavigator implements IAppNavigator {
                     sessionService
             );
 
-            // --- SỬA LỖI (UR-37): Tiêm libraryTreeViewModel vào đây ---
             IItemDetailViewModel itemDetailViewModel = new ItemDetailViewModel(
                     itemRepository,
                     itemUpdateService,
@@ -126,9 +131,9 @@ public class AppNavigator implements IAppNavigator {
                     libraryTreeViewModel,
                     configService
             );
-            // --- KẾT THÚC SỬA LỖI ---
 
             // 3. Tạo MainController (View-Coordinator) và tiêm MỌI THỨ
+            // (SỬA ĐỔI GĐ 11: Tiêm 'this' (IAppNavigator) vào MainController)
             MainController controller = new MainController(
                     mainViewModel,
                     libraryTreeViewModel,
@@ -136,21 +141,64 @@ public class AppNavigator implements IAppNavigator {
                     itemDetailViewModel,
                     configService,
                     preferenceService,
-                    notificationService
+                    notificationService,
+                    this // Tiêm IAppNavigator
             );
 
             // 4. Tải FXML và tiêm Controller
-            loadScene("MainView.fxml", configService.getString("mainApp", "mainTitle"), controller, primaryStage);
+            loadScene("MainView.fxml", configService.getString("mainApp", "mainTitle"), controller, primaryStage, false);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * (MỚI - GĐ 11) Triển khai hiển thị dialog Add Tag (UR-35).
+     */
     @Override
-    public Tag showAddTagDialog(Stage ownerStage) {
-        // (Giai đoạn 11)
-        return null;
+    public AddTagResult showAddTagDialog(Stage ownerStage, SuggestionContext context) {
+        try {
+            URL fxmlUrl = MainApp.class.getResource("view/fxml/AddTagDialog.fxml");
+            FXMLLoader loader = new FXMLLoader(fxmlUrl);
+
+            // 1. Tạo ViewModel cho dialog
+            // (Tiêm các repo cần thiết cho gợi ý và copy-by-id)
+            IAddTagViewModel viewModel = new AddTagViewModel(
+                    staticDataRepository,
+                    itemRepository
+            );
+            viewModel.setContext(context);
+
+            // 2. Tải FXML (Controller được FXML tự khởi tạo)
+            Parent root = loader.load();
+            AddTagDialogController controller = loader.getController();
+
+            // 3. Cấu hình Stage (Cửa sổ)
+            Stage dialogStage = new Stage();
+            // (Lấy title từ VM, VM đã xử lý I18n)
+            dialogStage.titleProperty().bind(viewModel.titleProperty());
+            dialogStage.initModality(Modality.WINDOW_MODAL);
+            dialogStage.initOwner(ownerStage);
+
+            Scene scene = new Scene(root);
+            scene.getStylesheets().addAll(ownerStage.getScene().getStylesheets());
+            dialogStage.setScene(scene);
+
+            // 4. Tiêm ViewModel và Stage vào Controller
+            controller.setViewModel(viewModel, dialogStage);
+
+            // 5. Hiển thị và chờ
+            dialogStage.showAndWait();
+
+            // 6. Trả về kết quả từ ViewModel
+            return viewModel.getResult();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            notificationService.showStatus("Lỗi: Không thể mở dialog. " + e.getMessage());
+            return null;
+        }
     }
 
     @Override
@@ -166,14 +214,17 @@ public class AppNavigator implements IAppNavigator {
     /**
      * Helper nội bộ để tải FXML, tiêm Controller, và hiển thị Scene.
      */
-    private void loadScene(String fxmlFile, String title, Object controllerInstance, Stage stage) throws IOException {
+    private void loadScene(String fxmlFile, String title, Object controllerInstance, Stage stage, boolean isDialog) throws IOException {
         URL fxmlUrl = MainApp.class.getResource("view/fxml/" + fxmlFile);
         if (fxmlUrl == null) {
             throw new IOException("Không tìm thấy FXML: " + fxmlFile);
         }
 
         FXMLLoader loader = new FXMLLoader(fxmlUrl);
-        loader.setController(controllerInstance);
+        // (Chỉ set controller nếu được cung cấp)
+        if (controllerInstance != null) {
+            loader.setController(controllerInstance);
+        }
         Parent root = loader.load();
 
         Scene scene = stage.getScene();
@@ -188,8 +239,7 @@ public class AppNavigator implements IAppNavigator {
         // Tải CSS
         URL cssUrl = MainApp.class.getResource("styles.css");
         if (cssUrl != null) {
-            // (Đảm bảo chỉ add 1 lần)
-            if (scene.getStylesheets().isEmpty()) {
+            if (scene.getStylesheets().isEmpty() || isDialog) {
                 scene.getStylesheets().add(cssUrl.toExternalForm());
             }
         } else {

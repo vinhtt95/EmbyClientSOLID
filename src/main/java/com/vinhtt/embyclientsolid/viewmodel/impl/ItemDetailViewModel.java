@@ -6,9 +6,11 @@ import com.vinhtt.embyclientsolid.core.*;
 import com.vinhtt.embyclientsolid.data.*;
 import com.vinhtt.embyclientsolid.model.LibraryTreeItem;
 import com.vinhtt.embyclientsolid.model.ReleaseInfo;
+import com.vinhtt.embyclientsolid.model.SuggestionContext; // (MỚI)
 import com.vinhtt.embyclientsolid.model.SuggestionItem;
 import com.vinhtt.embyclientsolid.model.Tag;
 import com.vinhtt.embyclientsolid.services.JsonFileHandler;
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult; // (MỚI)
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
 import embyclient.JSON;
@@ -38,11 +40,11 @@ import java.io.File;
 
 /**
  * Triển khai (Implementation) của IItemDetailViewModel (Cột 3).
- * (Cập nhật GĐ 10: Hoàn thiện Clone, Import/Export).
- * (Cập nhật GĐ 10.2: Sửa lỗi Rating (Bad Request) và Import (Save Button)).
+ * (Cập nhật GĐ 11: Xử lý AddTagDialog).
  */
 public class ItemDetailViewModel implements IItemDetailViewModel {
 
+    // --- Services (DI) ---
     private final IItemRepository itemRepository;
     private final IItemUpdateService itemUpdateService;
     private final IStaticDataRepository staticDataRepository;
@@ -52,16 +54,21 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private final IEmbySessionService sessionService;
     private final ILibraryTreeViewModel libraryTreeViewModel;
     private final IConfigurationService configService;
+    // (Lưu ý: IAppNavigator được inject vào MainController,
+    // VM này sẽ bắn sự kiện để MainController gọi Navigator)
 
+    // --- Helpers ---
     private final ItemDetailDirtyTracker dirtyTracker;
     private final ItemDetailImportHandler importHandler;
     private final JsonFileHandler jsonFileHandler;
     private final Gson gson;
 
+    // --- Trạng thái nội bộ ---
     private BaseItemDto originalItemDto;
     private String currentItemId;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 
+    // --- Properties (Trạng thái UI) ---
     private final ReadOnlyBooleanWrapper loading = new ReadOnlyBooleanWrapper(false);
     private final ReadOnlyStringWrapper statusMessage = new ReadOnlyStringWrapper("Vui lòng chọn một item...");
     private final ReadOnlyBooleanWrapper showStatusMessage = new ReadOnlyBooleanWrapper(true);
@@ -84,7 +91,13 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private final ObjectProperty<File> newPrimaryImageFile = new SimpleObjectProperty<>(null);
     private final ReadOnlyBooleanWrapper primaryImageDirty = new ReadOnlyBooleanWrapper(false);
 
+    // --- Properties Sự kiện (Event) ---
     private final ReadOnlyObjectWrapper<ChipClickEvent> chipClickEvent = new ReadOnlyObjectWrapper<>(null);
+    /**
+     * (MỚI - GĐ 11) Sự kiện yêu cầu mở dialog Add Chip.
+     */
+    private final ReadOnlyObjectWrapper<SuggestionContext> addChipCommand = new ReadOnlyObjectWrapper<>(null);
+
 
     public ItemDetailViewModel(IItemRepository itemRepository, IItemUpdateService itemUpdateService,
                                IStaticDataRepository staticDataRepository, IExternalDataService externalDataService,
@@ -168,6 +181,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
+    // ... (Hàm clearAllDetailsUI không đổi) ...
     private void clearAllDetailsUI() {
         dirtyTracker.stopTracking();
         originalItemDto = null;
@@ -191,6 +205,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         showStatusMessage.set(true);
     }
 
+    // ... (Các hàm parse... không đổi) ...
     private List<Tag> parseNameLongIdPair(List<NameLongIdPair> list) {
         if (list == null) return new ArrayList<>();
         return list.stream()
@@ -242,6 +257,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         return null;
     }
 
+    // ... (Hàm saveChangesCommand không đổi) ...
     @Override
     public void saveChangesCommand() {
         final BaseItemDto dtoAtSaveTime = this.originalItemDto;
@@ -310,10 +326,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    /**
-     * Helper cho logic (UR-49).
-     * Tạo DTO chỉ với các trường đã được chấp nhận (✓).
-     */
+    // ... (Hàm createDtoWithAcceptedChanges không đổi) ...
     private BaseItemDto createDtoWithAcceptedChanges(BaseItemDto originalDto, BaseItemDto importedDto, Set<String> acceptedFields) {
         BaseItemDto dtoCopy = gson.fromJson(gson.toJson(originalDto), BaseItemDto.class);
 
@@ -333,9 +346,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         return dtoCopy;
     }
 
-    /**
-     * Helper chuyển đổi String (UI) -> OffsetDateTime (DTO)
-     */
+    // ... (Hàm parseDateString không đổi) ...
     private OffsetDateTime parseDateString(String dateStr, OffsetDateTime fallback) {
         try {
             Date parsedDate = dateFormat.parse(dateStr);
@@ -346,39 +357,26 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }
     }
 
-    /**
-     * Helper chuyển đổi List<Tag> -> List<NameLongIdPair>
-     */
+    // ... (Hàm convertTags... không đổi) ...
     private List<NameLongIdPair> convertTagsToNameLongIdPair(List<Tag> tags) {
         return tags.stream()
                 .map(tag -> new NameLongIdPair().name(tag.serialize()))
                 .collect(Collectors.toList());
     }
-
-    /**
-     * Helper chuyển đổi List<Tag> -> List<BaseItemPerson>
-     */
     private List<BaseItemPerson> convertTagsToPeopleList(List<Tag> tags) {
         return tags.stream()
                 .map(tag -> new BaseItemPerson().name(tag.serialize()).type(PersonType.ACTOR))
                 .collect(Collectors.toList());
     }
 
-
+    // ... (Hàm saveCriticRatingImmediately không đổi) ...
     @Override
     public void saveCriticRatingImmediately(Float newRating) {
         if (originalItemDto == null || currentItemId == null) return;
-
-        // --- SỬA LỖI (UR-33 / Bad Request) ---
-        // Tạo một bản clone đầy đủ của DTO, chỉ thay đổi rating
-        // Gửi một DTO mới trống rỗng sẽ gây ra lỗi 400 Bad Request
         BaseItemDto ratingDto = gson.fromJson(gson.toJson(originalItemDto), BaseItemDto.class);
         ratingDto.setCriticRating(newRating);
-        // --- KẾT THÚC SỬA LỖI ---
-
         loading.set(true);
         notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSavingRating"));
-
         new Thread(() -> {
             try {
                 itemUpdateService.updateItem(currentItemId, ratingDto);
@@ -400,6 +398,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
+    // ... (Hàm fetchReleaseDateCommand không đổi) ...
     @Override
     public void fetchReleaseDateCommand() {
         String code = originalTitle.get();
@@ -463,6 +462,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
+    // ... (Hàm clonePropertiesCommand không đổi) ...
     @Override
     public void clonePropertiesCommand(String propertyType) {
         TreeItem<LibraryTreeItem> selectedFolder = libraryTreeViewModel.selectedTreeItemProperty().get();
@@ -512,6 +512,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
+    // ... (Các hàm open...Command không đổi) ...
     @Override
     public void openFileOrFolderCommand() {
         String path = itemPath.get();
@@ -521,7 +522,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             notificationService.showStatus(configService.getString("itemDetailView", "errorOpenPath", e.getMessage()));
         }
     }
-
     @Override
     public void openSubtitleCommand() {
         String path = itemPath.get();
@@ -534,7 +534,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             notificationService.showStatus(configService.getString("itemDetailView", "errorSubtitleOpen", e.getMessage()));
         }
     }
-
     @Override
     public void openScreenshotFolderCommand() {
         String path = itemPath.get();
@@ -546,6 +545,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }
     }
 
+    // ... (Các hàm xử lý Image không đổi) ...
     @Override
     public void setDroppedPrimaryImage(File imageFile) {
         if (imageFile == null || currentItemId == null) return;
@@ -557,7 +557,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             notificationService.showStatus(configService.getString("itemDetailViewModel", "errorImagePreview"));
         }
     }
-
     @Override
     public void saveNewPrimaryImageCommand() {
         File fileToSave = newPrimaryImageFile.get();
@@ -583,7 +582,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             }
         }).start();
     }
-
     @Override
     public void deleteBackdropCommand(ImageInfo backdrop) {
         if (backdrop == null || currentItemId == null) return;
@@ -600,7 +598,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             }
         }).start();
     }
-
     @Override
     public void uploadDroppedBackdropFiles(List<File> files) {
         if (files == null || files.isEmpty() || currentItemId == null) return;
@@ -631,16 +628,113 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    @Override public void addTagCommand() { /* GĐ 11 */ }
-    @Override public void addStudioCommand() { /* GĐ 11 */ }
-    @Override public void addGenreCommand() { /* GĐ 11 */ }
-    @Override public void addPeopleCommand() { /* GĐ 11 */ }
+    // --- (SỬA ĐỔI GĐ 11) ---
+    @Override public void addTagCommand() { addChipCommand.set(SuggestionContext.TAG); }
+    @Override public void addStudioCommand() { addChipCommand.set(SuggestionContext.STUDIO); }
+    @Override public void addGenreCommand() { addChipCommand.set(SuggestionContext.GENRE); }
+    @Override public void addPeopleCommand() { addChipCommand.set(SuggestionContext.PEOPLE); }
+    @Override public ReadOnlyObjectProperty<SuggestionContext> addChipCommandProperty() { return addChipCommand.getReadOnlyProperty(); }
+    @Override public void clearAddChipCommand() { addChipCommand.set(null); }
 
+    // ... (Các hàm remove... không đổi) ...
     @Override public void removeTag(Tag tag) { tagItems.remove(tag); }
     @Override public void removeStudio(Tag tag) { studioItems.remove(tag); }
     @Override public void removeGenre(Tag tag) { genreItems.remove(tag); }
     @Override public void removePeople(Tag tag) { peopleItems.remove(tag); }
 
+    // --- (MỚI - GĐ 11) ---
+    /**
+     * Xử lý kết quả từ AddTagDialog.
+     */
+    @Override
+    public void processAddTagResult(AddTagResult result, SuggestionContext context) {
+        if (result == null) return; // Người dùng hủy
+
+        if (result.isTag()) {
+            Tag newTag = result.getTag();
+            switch (context) {
+                case TAG:
+                    if (!tagItems.contains(newTag)) tagItems.add(newTag);
+                    break;
+                case STUDIO:
+                    if (!studioItems.contains(newTag)) studioItems.add(newTag);
+                    break;
+                case PEOPLE:
+                    if (!peopleItems.contains(newTag)) peopleItems.add(newTag);
+                    break;
+                case GENRE:
+                    if (!genreItems.contains(newTag)) genreItems.add(newTag);
+                    break;
+            }
+        } else if (result.isCopy()) {
+            // Kích hoạt logic "Copy From ID" (UR-35)
+            copyPropertiesFromItemCommand(result.getCopyId(), context);
+        }
+    }
+
+    /**
+     * (MỚI - GĐ 11) Logic "Copy From ID", port từ ItemDetailController (cũ).
+     */
+    private void copyPropertiesFromItemCommand(String sourceItemId, SuggestionContext context) {
+        if (currentItemId == null) {
+            notificationService.showStatus(configService.getString("itemDetailViewModel", "errorSave"));
+            return;
+        }
+        notificationService.showStatus(configService.getString("addTagDialog", "copyStatusLoading", sourceItemId));
+
+        new Thread(() -> {
+            try {
+                BaseItemDto sourceDto = itemRepository.getFullItemDetails(sourceItemId);
+                if (sourceDto == null) {
+                    throw new Exception(configService.getString("addTagDialog", "copyErrorNotFound"));
+                }
+
+                List<Tag> sourceTagsToCopy = new ArrayList<>();
+                switch (context) {
+                    case TAG:
+                        sourceTagsToCopy.addAll(parseNameLongIdPair(sourceDto.getTagItems()));
+                        break;
+                    case STUDIO:
+                        sourceTagsToCopy.addAll(parseNameLongIdPair(sourceDto.getStudios()));
+                        break;
+                    case PEOPLE:
+                        sourceTagsToCopy.addAll(parseBaseItemPerson(sourceDto.getPeople()));
+                        break;
+                    case GENRE:
+                        sourceTagsToCopy.addAll(parseStringList(sourceDto.getGenres()));
+                        break;
+                }
+
+                final List<Tag> finalSourceTags = sourceTagsToCopy;
+                Platform.runLater(() -> {
+                    ObservableList<Tag> destinationList;
+                    switch (context) {
+                        case TAG: destinationList = tagItems; break;
+                        case STUDIO: destinationList = studioItems; break;
+                        case PEOPLE: destinationList = peopleItems; break;
+                        case GENRE: destinationList = genreItems; break;
+                        default: return;
+                    }
+
+                    Set<Tag> existingTags = new HashSet<>(destinationList);
+                    int addedCount = 0;
+                    for (Tag newTag : finalSourceTags) {
+                        if (existingTags.add(newTag)) { // (HashSet.add trả về true nếu thêm mới)
+                            destinationList.add(newTag);
+                            addedCount++;
+                        }
+                    }
+                    notificationService.showStatus(configService.getString("addTagDialog", "copySuccessStatus", addedCount, sourceItemId));
+                });
+
+            } catch (Exception e) {
+                Platform.runLater(() -> notificationService.showStatus(configService.getString("addTagDialog", "copyErrorStatus", sourceItemId, e.getMessage())));
+            }
+        }).start();
+    }
+
+
+    // ... (Các hàm Import/Export không đổi) ...
     @Override
     public void importAndPreview(File file) {
         if (originalItemDto == null) return;
@@ -667,7 +761,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             }
         }).start();
     }
-
     @Override
     public void exportCommand(File file) {
         if (originalItemDto == null) {
@@ -689,24 +782,10 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             }
         }).start();
     }
-
-    @Override
-    public void acceptImportField(String fieldName) {
-        importHandler.acceptImportField(fieldName);
-    }
-
-    @Override
-    public void rejectImportField(String fieldName) {
-        importHandler.rejectImportField(fieldName);
-    }
-
-    @Override
-    public void markAsDirtyByAccept() {
-        dirtyTracker.forceDirty();
-    }
-
-    @Override
-    public String getExportFileName() {
+    @Override public void acceptImportField(String fieldName) { importHandler.acceptImportField(fieldName); }
+    @Override public void rejectImportField(String fieldName) { importHandler.rejectImportField(fieldName); }
+    @Override public void markAsDirtyByAccept() { dirtyTracker.forceDirty(); }
+    @Override public String getExportFileName() {
         String name = originalTitle.get();
         if (name == null || name.trim().isEmpty()) {
             name = title.get();
@@ -717,16 +796,17 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         return name;
     }
 
+    // ... (Các hàm clearChipClickEvent/fireChipClickEvent không đổi) ...
     @Override
     public void clearChipClickEvent() {
         chipClickEvent.set(null);
     }
-
     @Override
     public void fireChipClickEvent(Tag model, String type) {
         chipClickEvent.set(new ChipClickEvent(model, type));
     }
 
+    // --- Getters cho Properties (Binding) ---
     @Override public ReadOnlyBooleanProperty loadingProperty() { return loading.getReadOnlyProperty(); }
     @Override public ReadOnlyStringProperty statusMessageProperty() { return statusMessage.getReadOnlyProperty(); }
     @Override public ReadOnlyBooleanProperty showStatusMessageProperty() { return showStatusMessage.getReadOnlyProperty(); }

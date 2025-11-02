@@ -1,5 +1,6 @@
 package com.vinhtt.embyclientsolid.viewmodel;
 
+import com.vinhtt.embyclientsolid.model.SuggestionContext; // (MỚI)
 import com.vinhtt.embyclientsolid.model.Tag;
 import embyclient.model.BaseItemDto;
 import embyclient.model.ImageInfo;
@@ -16,7 +17,7 @@ import java.util.List;
 
 /**
  * Interface cho ItemDetailViewModel (Cột 3).
- * (Cập nhật GĐ 10: Thêm các hàm/props cho Import/Export).
+ * (Cập nhật GĐ 11: Thêm các hàm/props cho AddTagDialog).
  */
 public interface IItemDetailViewModel {
 
@@ -41,9 +42,6 @@ public interface IItemDetailViewModel {
     // --- Trạng thái Dirty/Import (Binding) ---
     ReadOnlyBooleanProperty isDirtyProperty();
     ReadOnlyBooleanProperty primaryImageDirtyProperty();
-    /**
-     * (MỚI) Các property để hiển thị nút (✓/✗) (UR-46).
-     */
     ReadOnlyBooleanProperty showTitleReviewProperty();
     ReadOnlyBooleanProperty showOverviewReviewProperty();
     ReadOnlyBooleanProperty showReleaseDateReviewProperty();
@@ -59,6 +57,18 @@ public interface IItemDetailViewModel {
     void clearChipClickEvent();
     void fireChipClickEvent(Tag model, String type);
     String getBackdropUrl(ImageInfo info);
+
+    /**
+     * (MỚI - GĐ 11) Property sự kiện để báo cho MainController mở dialog.
+     * @return Property chứa Context (TAG, STUDIO, v.v.)
+     */
+    ReadOnlyObjectProperty<SuggestionContext> addChipCommandProperty();
+
+    /**
+     * (MỚI - GĐ 11) Xóa sự kiện (sau khi MainController đã xử lý).
+     */
+    void clearAddChipCommand();
+
 
     // --- Hành động (Commands) ---
     void loadItem(BaseItemDto item);
@@ -78,7 +88,7 @@ public interface IItemDetailViewModel {
     void deleteBackdropCommand(ImageInfo imageInfo);
     void uploadDroppedBackdropFiles(List<File> files);
 
-    // Commands Chip
+    // Commands Chip (giờ đây sẽ kích hoạt 'addChipCommandProperty')
     void addTagCommand();
     void addStudioCommand();
     void addGenreCommand();
@@ -88,17 +98,21 @@ public interface IItemDetailViewModel {
     void removeGenre(Tag tag);
     void removePeople(Tag tag);
 
-    // --- (MỚI) Commands Import/Export (UR-44, 45, 47) ---
+    // --- Commands Import/Export (UR-44, 45, 47) ---
     void importAndPreview(File file);
     void exportCommand(File file);
     void acceptImportField(String fieldName);
     void rejectImportField(String fieldName);
-    /**
-     * (MỚI) Được gọi bởi ImportHandler khi nhấn Accept (✓).
-     * (UR-47).
-     */
     void markAsDirtyByAccept();
     String getExportFileName();
+
+    /**
+     * (MỚI - GĐ 11) Xử lý kết quả trả về từ AppNavigator.showAddTagDialog.
+     * @param result Kết quả (Tag hoặc CopyId).
+     * @param context Bối cảnh (để biết thêm vào list nào).
+     */
+    void processAddTagResult(AddTagResult result, SuggestionContext context);
+
 
     /**
      * Lớp POJO cho sự kiện click chip (UR-36).
