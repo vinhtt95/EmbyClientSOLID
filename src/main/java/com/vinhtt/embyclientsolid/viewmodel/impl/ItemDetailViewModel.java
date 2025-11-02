@@ -356,7 +356,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
     private List<NameLongIdPair> convertTagsToNameLongIdPair(List<Tag> tags) {
         return tags.stream()
-                .map(tag -> new NameLongIdPair().name(tag.serialize()))
+                .map(tag -> new NameLongIdPair().name(tag.serialize()).id(null))
                 .collect(Collectors.toList());
     }
     private List<BaseItemPerson> convertTagsToPeopleList(List<Tag> tags) {

@@ -145,8 +145,7 @@ public class AddTagDialogController {
         simpleNameField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             viewModel.handleFieldKeyEvent(e, "simple");
             if (e.getCode() == KeyCode.TAB && !e.isShiftDown()) {
-                keyField.requestFocus();
-                keyField.positionCaret(keyField.getText().length());
+                valueField.requestFocus();
             }
         });
         keyField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {

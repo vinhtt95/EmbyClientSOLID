@@ -365,14 +365,21 @@ public class AddTagViewModel implements IAddTagViewModel {
             }
         } else if ("simple".equals(sourceField)) {
             String currentSimpleText = simpleName.get();
+
+            // 1. Chuyển chế độ và cập nhật text
             isUpdatingProgrammatically = true;
             simpleMode.set(false);
             key.set(currentSimpleText);
             simpleName.set("");
             value.set("");
             isUpdatingProgrammatically = false;
+
+            // 2. Populate lại
             populateKeys(currentSimpleText);
             populateSimpleTags(currentSimpleText);
+
+            // 3. (FIX) Gọi logic auto-complete của 'key'
+            handleFocusLost("key");
         }
     }
 
