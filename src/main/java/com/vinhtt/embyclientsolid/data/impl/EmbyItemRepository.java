@@ -135,39 +135,489 @@ public class EmbyItemRepository implements IItemRepository {
 
     @Override
     public List<BaseItemDto> getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive) throws ApiException {
-        System.out.println();
+        System.out.println(chip.toString() +"Type: "+ chipType.toString());
         // --- LOGIC MỚI (LẦN 5) - Sửa lại Studio theo yêu cầu của ông ---
         String apiParam;
+        QueryResultBaseItemDto listItems = null;
 
         switch (chipType) {
             case "TAG":
-                apiParam = chip.serialize(); // Tag dùng tên đã serialize (JSON hoặc text)
-                // Lệnh gọi này ĐÚNG: apiParam được truyền vào 'tags' (tham số 59)
-                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null).getItems();
+                String tagsName;
+                tagsName = chip.serialize(); // Tag dùng tên đã serialize (JSON hoặc text)
+                try {
+                    listItems = getItemsService().getItems(
+                            null,    //artistType
+                            null,    //maxOfficialRating
+                            null,    //hasThemeSong
+                            null,    //hasThemeVideo
+                            null,    //hasSubtitles
+                            null,    //hasSpecialFeature
+                            null,    //hasTrailer
+                            null,    //isSpecialSeason
+                            null,    //adjacentTo
+                            null,    //startItemId
+                            null,    //minIndexNumber
+                            null,    //minStartDate
+                            null,    //maxStartDate
+                            null,    //minEndDate
+                            null,    //maxEndDate
+                            null,    //minPlayers
+                            null,    //maxPlayers
+                            null,    //parentIndexNumber
+                            null,    //hasParentalRating
+                            null,    //isHD
+                            null,    //isUnaired
+                            null,    //minCommunityRating
+                            null,    //minCriticRating
+                            null,    //airedDuringSeason
+                            null,    //minPremiereDate
+                            null,    //minDateLastSaved
+                            null,    //minDateLastSavedForUser
+                            null,    //maxPremiereDate
+                            null,    //hasOverview
+                            null,    //hasImdbId
+                            null,    //hasTmdbId
+                            null,    //hasTvdbId
+                            null,    //excludeItemIds
+                            startIndex,    //startIndex
+                            limit,    //limit
+                            recursive,    //recursive
+                            null,    //searchTerm
+                            "Ascending",    //sortOrder
+                            null,    //parentId
+                            null,    //fields
+                            null,    //excludeItemTypes
+                            "Movie,Series,Video,Game",    //includeItemTypes
+                            null,    //anyProviderIdEquals
+                            null,    //filters
+                            null,    //isFavorite
+                            null,    //isMovie
+                            null,    //isSeries
+                            null,    //isFolder
+                            null,    //isNews
+                            null,    //isKids
+                            null,    //isSports
+                            null,    //isNew
+                            null,    //isPremiere
+                            null,    //isNewOrPremiere
+                            null,    //isRepeat
+                            null,    //projectToMedia
+                            null,    //mediaTypes
+                            null,    //imageTypes
+                            null,    //sortBy
+                            null,    //isPlayed
+                            null,    //genres
+                            null,    //officialRatings
+                            tagsName,    //tags
+                            null,    //excludeTags
+                            null,    //years
+                            null,    //enableImages
+                            null,    //enableUserData
+                            null,    //imageTypeLimit
+                            null,    //enableImageTypes
+                            null,    //person
+                            null,    //personIds
+                            null,    //personTypes
+                            null,    //studios
+                            null,    //studioIds
+                            null,    //artists
+                            null,    //artistIds
+                            null,    //albums
+                            null,    //ids
+                            null,    //videoTypes
+                            null,    //containers
+                            null,    //audioCodecs
+                            null,    //audioLayouts
+                            null,    //videoCodecs
+                            null,    //extendedVideoTypes
+                            null,    //subtitleCodecs
+                            null,    //path
+                            null,    //userId
+                            null,    //minOfficialRating
+                            null,    //isLocked
+                            null,    //isPlaceHolder
+                            null,    //hasOfficialRating
+                            null,    //groupItemsIntoCollections
+                            null,    //is3D
+                            null,    //seriesStatus
+                            null,    //nameStartsWithOrGreater
+                            null,    //artistStartsWithOrGreater
+                            null,    //albumArtistStartsWithOrGreater
+                            null,    //nameStartsWith
+                            null    //nameLessThan
+                    );
+                    if (listItems.getItems().isEmpty()) {
+                        System.out.println("Empty Item Tags");
+                    }
+
+                    if (!listItems.getItems().isEmpty()) {
+
+                        return listItems.getItems();
+                    }
+
+                } catch (ApiException e) {
+                    System.out.println("Error fetching tags: " + e.getMessage());
+                }
+                return Collections.emptyList();
 
             case "STUDIO":
-                // --- SỬA LỖI THEO YÊU CẦU: Dùng TÊN (serialize) thay vì ID ---
-                apiParam = chip.serialize(); // Studio dùng TÊN (hoặc JSON string)
-                if (apiParam == null) throw new ApiException("Studio Name is null for: " + chip.getDisplayName());
-                // SỬA LỖI: apiParam (TÊN) được truyền vào 'studios' (tham số 69)
-                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null).getItems();
+                String studioId;
+                studioId = chip.getId(); // Studio dùng TÊN (hoặc JSON string)
+                if (studioId == null) throw new ApiException("Studio Name is null for: " + chip.getDisplayName());
+                System.out.println("studioId: "+ studioId);
+                try {
+                    listItems = getItemsService().getItems(
+                            null,    //artistType
+                            null,    //maxOfficialRating
+                            null,    //hasThemeSong
+                            null,    //hasThemeVideo
+                            null,    //hasSubtitles
+                            null,    //hasSpecialFeature
+                            null,    //hasTrailer
+                            null,    //isSpecialSeason
+                            null,    //adjacentTo
+                            null,    //startItemId
+                            null,    //minIndexNumber
+                            null,    //minStartDate
+                            null,    //maxStartDate
+                            null,    //minEndDate
+                            null,    //maxEndDate
+                            null,    //minPlayers
+                            null,    //maxPlayers
+                            null,    //parentIndexNumber
+                            null,    //hasParentalRating
+                            null,    //isHD
+                            null,    //isUnaired
+                            null,    //minCommunityRating
+                            null,    //minCriticRating
+                            null,    //airedDuringSeason
+                            null,    //minPremiereDate
+                            null,    //minDateLastSaved
+                            null,    //minDateLastSavedForUser
+                            null,    //maxPremiereDate
+                            null,    //hasOverview
+                            null,    //hasImdbId
+                            null,    //hasTmdbId
+                            null,    //hasTvdbId
+                            null,    //excludeItemIds
+                            startIndex,    //startIndex
+                            limit,    //limit
+                            recursive,    //recursive
+                            null,    //searchTerm
+                            "Ascending",    //sortOrder
+                            null,    //parentId
+                            null,    //fields
+                            null,    //excludeItemTypes
+                            "Movie,Series,Video,Game",    //includeItemTypes
+                            null,    //anyProviderIdEquals
+                            null,    //filters
+                            null,    //isFavorite
+                            null,    //isMovie
+                            null,    //isSeries
+                            null,    //isFolder
+                            null,    //isNews
+                            null,    //isKids
+                            null,    //isSports
+                            null,    //isNew
+                            null,    //isPremiere
+                            null,    //isNewOrPremiere
+                            null,    //isRepeat
+                            null,    //projectToMedia
+                            null,    //mediaTypes
+                            null,    //imageTypes
+                            null,    //sortBy
+                            null,    //isPlayed
+                            null,    //genres
+                            null,    //officialRatings
+                            null,    //tags
+                            null,    //excludeTags
+                            null,    //years
+                            null,    //enableImages
+                            null,    //enableUserData
+                            null,    //imageTypeLimit
+                            null,    //enableImageTypes
+                            null,    //person
+                            null,    //personIds
+                            null,    //personTypes
+                            null,    //studios
+                            studioId,    //studioIds
+                            null,    //artists
+                            null,    //artistIds
+                            null,    //albums
+                            null,    //ids
+                            null,    //videoTypes
+                            null,    //containers
+                            null,    //audioCodecs
+                            null,    //audioLayouts
+                            null,    //videoCodecs
+                            null,    //extendedVideoTypes
+                            null,    //subtitleCodecs
+                            null,    //path
+                            null,    //userId
+                            null,    //minOfficialRating
+                            null,    //isLocked
+                            null,    //isPlaceHolder
+                            null,    //hasOfficialRating
+                            null,    //groupItemsIntoCollections
+                            null,    //is3D
+                            null,    //seriesStatus
+                            null,    //nameStartsWithOrGreater
+                            null,    //artistStartsWithOrGreater
+                            null,    //albumArtistStartsWithOrGreater
+                            null,    //nameStartsWith
+                            null    //nameLessThan
+                    );
 
+                    if (listItems.getItems().isEmpty()) {
+                        System.out.println("Empty Studios");
+                    }
+
+                    if (!listItems.getItems().isEmpty()) {
+
+                        return listItems.getItems();
+                    }
+
+                } catch (ApiException e) {
+                    System.out.println("Error fetching studios: " + e.getMessage());
+                }
+                return Collections.emptyList();
             case "PEOPLE":
-                // --- GIỮ NGUYÊN: Dùng ID (Vì ông nói nó OK) ---
                 apiParam = chip.getId(); // People dùng ID
                 if (apiParam == null) throw new ApiException("People ID is null for: ".concat(chip.getDisplayName()));
-                // SỬA LỖI: apiParam (ID) được truyền vào 'personIds' (tham số 67)
-                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, "Ascending", null, null, null, "Movie,Series,Video,Game", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                        null, null,null,
-                        apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null).getItems();
+                String peopleID = chip.getId(); // Genre dùng tên hiển thị
+                try{
+                    listItems = getItemsService().getItems(
+                            null,    //artistType
+                            null,    //maxOfficialRating
+                            null,    //hasThemeSong
+                            null,    //hasThemeVideo
+                            null,    //hasSubtitles
+                            null,    //hasSpecialFeature
+                            null,    //hasTrailer
+                            null,    //isSpecialSeason
+                            null,    //adjacentTo
+                            null,    //startItemId
+                            null,    //minIndexNumber
+                            null,    //minStartDate
+                            null,    //maxStartDate
+                            null,    //minEndDate
+                            null,    //maxEndDate
+                            null,    //minPlayers
+                            null,    //maxPlayers
+                            null,    //parentIndexNumber
+                            null,    //hasParentalRating
+                            null,    //isHD
+                            null,    //isUnaired
+                            null,    //minCommunityRating
+                            null,    //minCriticRating
+                            null,    //airedDuringSeason
+                            null,    //minPremiereDate
+                            null,    //minDateLastSaved
+                            null,    //minDateLastSavedForUser
+                            null,    //maxPremiereDate
+                            null,    //hasOverview
+                            null,    //hasImdbId
+                            null,    //hasTmdbId
+                            null,    //hasTvdbId
+                            null,    //excludeItemIds
+                            startIndex,    //startIndex
+                            limit,    //limit
+                            recursive,    //recursive
+                            null,    //searchTerm
+                            "Ascending",    //sortOrder
+                            null,    //parentId
+                            null,    //fields
+                            null,    //excludeItemTypes
+                            "Movie,Series,Video,Game",    //includeItemTypes
+                            null,    //anyProviderIdEquals
+                            null,    //filters
+                            null,    //isFavorite
+                            null,    //isMovie
+                            null,    //isSeries
+                            null,    //isFolder
+                            null,    //isNews
+                            null,    //isKids
+                            null,    //isSports
+                            null,    //isNew
+                            null,    //isPremiere
+                            null,    //isNewOrPremiere
+                            null,    //isRepeat
+                            null,    //projectToMedia
+                            null,    //mediaTypes
+                            null,    //imageTypes
+                            null,    //sortBy
+                            null,    //isPlayed
+                            null,    //genres
+                            null,    //officialRatings
+                            null,    //tags
+                            null,    //excludeTags
+                            null,    //years
+                            null,    //enableImages
+                            null,    //enableUserData
+                            null,    //imageTypeLimit
+                            null,    //enableImageTypes
+                            null,    //person
+                            peopleID,    //personIds
+                            null,    //personTypes
+                            null,    //studios
+                            null,    //studioIds
+                            null,    //artists
+                            null,    //artistIds
+                            null,    //albums
+                            null,    //ids
+                            null,    //videoTypes
+                            null,    //containers
+                            null,    //audioCodecs
+                            null,    //audioLayouts
+                            null,    //videoCodecs
+                            null,    //extendedVideoTypes
+                            null,    //subtitleCodecs
+                            null,    //path
+                            null,    //userId
+                            null,    //minOfficialRating
+                            null,    //isLocked
+                            null,    //isPlaceHolder
+                            null,    //hasOfficialRating
+                            null,    //groupItemsIntoCollections
+                            null,    //is3D
+                            null,    //seriesStatus
+                            null,    //nameStartsWithOrGreater
+                            null,    //artistStartsWithOrGreater
+                            null,    //albumArtistStartsWithOrGreater
+                            null,    //nameStartsWith
+                            null    //nameLessThan
+                    );
+
+                    if (listItems.getItems().isEmpty()) {
+                        System.out.println("Empty People");
+                    }
+
+                    if (!listItems.getItems().isEmpty()) {
+
+                        return listItems.getItems();
+                    }
+                } catch (ApiException e) {
+                    System.out.println("Error fetching people: " + e.getMessage());
+                }
+                return Collections.emptyList();
 
             case "GENRE":
-                // --- GIỮ NGUYÊN: Dùng TÊN (Vì ông nói nó OK) ---
-                apiParam = chip.getDisplayName(); // Genre dùng tên hiển thị
-                // Lệnh gọi này ĐÚNG: apiParam được truyền vào 'nameGenres' (tham số 57)
-                return getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, recursive, null, null, null, null, null, "Movie, Series, Video, Game, MusicAlbum", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                        null,
-                        apiParam, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null).getItems();
+                String nameGenres = chip.serialize(); // Genre dùng tên hiển thị
+
+                try {
+                    listItems = getItemsService().getItems(
+                            null,    //artistType
+                            null,    //maxOfficialRating
+                            null,    //hasThemeSong
+                            null,    //hasThemeVideo
+                            null,    //hasSubtitles
+                            null,    //hasSpecialFeature
+                            null,    //hasTrailer
+                            null,    //isSpecialSeason
+                            null,    //adjacentTo
+                            null,    //startItemId
+                            null,    //minIndexNumber
+                            null,    //minStartDate
+                            null,    //maxStartDate
+                            null,    //minEndDate
+                            null,    //maxEndDate
+                            null,    //minPlayers
+                            null,    //maxPlayers
+                            null,    //parentIndexNumber
+                            null,    //hasParentalRating
+                            null,    //isHD
+                            null,    //isUnaired
+                            null,    //minCommunityRating
+                            null,    //minCriticRating
+                            null,    //airedDuringSeason
+                            null,    //minPremiereDate
+                            null,    //minDateLastSaved
+                            null,    //minDateLastSavedForUser
+                            null,    //maxPremiereDate
+                            null,    //hasOverview
+                            null,    //hasImdbId
+                            null,    //hasTmdbId
+                            null,    //hasTvdbId
+                            null,    //excludeItemIds
+                            startIndex,    //startIndex
+                            limit,    //limit
+                            recursive,    //recursive
+                            null,    //searchTerm
+                            null,    //sortOrder
+                            null,    //parentId
+                            null,    //fields
+                            null,    //excludeItemTypes
+                            "Movie, Series, Video, Game, MusicAlbum",    //includeItemTypes
+                            null,    //anyProviderIdEquals
+                            null,    //filters
+                            null,    //isFavorite
+                            null,    //isMovie
+                            null,    //isSeries
+                            null,    //isFolder
+                            null,    //isNews
+                            null,    //isKids
+                            null,    //isSports
+                            null,    //isNew
+                            null,    //isPremiere
+                            null,    //isNewOrPremiere
+                            null,    //isRepeat
+                            null,    //projectToMedia
+                            null,    //mediaTypes
+                            null,    //imageTypes
+                            null,    //sortBy
+                            null,    //isPlayed
+                            nameGenres,    //genres
+                            null,    //officialRatings
+                            null,    //tags
+                            null,    //excludeTags
+                            null,    //years
+                            null,    //enableImages
+                            null,    //enableUserData
+                            null,    //imageTypeLimit
+                            null,    //enableImageTypes
+                            null,    //person
+                            null,    //personIds
+                            null,    //personTypes
+                            null,    //studios
+                            null,    //studioIds
+                            null,    //artists
+                            null,    //artistIds
+                            null,    //albums
+                            null,    //ids
+                            null,    //videoTypes
+                            null,    //containers
+                            null,    //audioCodecs
+                            null,    //audioLayouts
+                            null,    //videoCodecs
+                            null,    //extendedVideoTypes
+                            null,    //subtitleCodecs
+                            null,    //path
+                            null,    //userId
+                            null,    //minOfficialRating
+                            null,    //isLocked
+                            null,    //isPlaceHolder
+                            null,    //hasOfficialRating
+                            null,    //groupItemsIntoCollections
+                            null,    //is3D
+                            null,    //seriesStatus
+                            null,    //nameStartsWithOrGreater
+                            null,    //artistStartsWithOrGreater
+                            null,    //albumArtistStartsWithOrGreater
+                            null,    //nameStartsWith
+                            null    //nameLessThan
+                    );
+                    if (listItems.getItems().isEmpty()) {
+                        System.out.println("Empty Genres");
+                    }
+
+                    if (!listItems.getItems().isEmpty()) {
+
+                        return listItems.getItems();
+                    }
+                } catch (ApiException e) {
+                    System.out.println("Error fetching Genres: " + e.getMessage());
+                }
+                return Collections.emptyList();
 
             default:
                 return Collections.emptyList();

@@ -339,7 +339,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
         new Thread(() -> {
             try {
                 // (Giả định API trả về tất cả, không phân trang)
-                List<BaseItemDto> chipItems = itemRepository.getItemsByChip(chip, chipType, 0, 1000, true);
+                List<BaseItemDto> chipItems = itemRepository.getItemsByChip(chip, chipType, 0, 50, true);
 
                 QueryResultBaseItemDto result = new QueryResultBaseItemDto();
                 result.setItems(chipItems);
