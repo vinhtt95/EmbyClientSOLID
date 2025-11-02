@@ -40,7 +40,7 @@ import java.io.File;
 
 /**
  * Triển khai (Implementation) của IItemDetailViewModel (Cột 3).
- * (Cập nhật: Thêm logic lưu lastAddContext cho hotkey UR-13).
+ * (Cập nhật: Sửa lỗi biên dịch 'List<Tag> cannot be converted to List<SuggestionItem>').
  */
 public class ItemDetailViewModel implements IItemDetailViewModel {
 
@@ -65,9 +65,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private BaseItemDto originalItemDto;
     private String currentItemId;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
-    /**
-     * (MỚI - GĐ 12/UR-13) Lưu context cuối cùng được sử dụng.
-     */
     private SuggestionContext lastAddContext = SuggestionContext.TAG;
 
 
@@ -410,20 +407,26 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                 }
 
                 List<Tag> tagsFromPerson = new ArrayList<>();
-                Tag personTag = null;
+                Tag personTag = null; // Đây là tag của chính diễn viên đó
 
                 if (info.getActressName() != null && !info.getActressName().isEmpty()) {
-                    List<SuggestionItem> people = staticDataRepository.getPeopleSuggestions();
-                    SuggestionItem person = people.stream()
-                            .filter(p -> info.getActressName().equalsIgnoreCase(p.getName()))
-                            .findFirst().orElse(null);
 
-                    if (person != null) {
-                        BaseItemDto personDto = itemRepository.getFullItemDetails(person.getId());
+                    // --- SỬA LỖI BIÊN DỊCH (UR-38) ---
+                    // 1. Lấy List<Tag> thay vì List<SuggestionItem>
+                    List<Tag> peopleTags = staticDataRepository.getPeopleSuggestions();
+
+                    // 2. Lọc List<Tag> bằng getDisplayName()
+                    Tag personTagResult = peopleTags.stream()
+                            .filter(p -> info.getActressName().equalsIgnoreCase(p.getDisplayName()))
+                            .findFirst().orElse(null);
+                    // --- KẾT THÚC SỬA LỖI ---
+
+                    if (personTagResult != null) {
+                        BaseItemDto personDto = itemRepository.getFullItemDetails(personTagResult.getId());
                         if (personDto != null && personDto.getTagItems() != null) {
                             tagsFromPerson.addAll(parseNameLongIdPair(personDto.getTagItems()));
                         }
-                        personTag = Tag.parse(person.getName(), person.getId());
+                        personTag = personTagResult; // Gán Tag tìm được
                     }
                 }
 

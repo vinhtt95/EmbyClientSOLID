@@ -27,7 +27,7 @@ import java.util.Objects;
 
 /**
  * Controller cho AddTagDialog.fxml (View).
- * (Cập nhật: Thêm listener cho focus lost).
+ * (Cập nhật: Sửa lỗi biên dịch 'isJson()' và thêm listener 'focus lost').
  */
 public class AddTagDialogController {
 
@@ -170,7 +170,7 @@ public class AddTagDialogController {
             }
         });
 
-        // --- (MỚI) Chuyển tiếp (Delegate) Sự kiện Mất Focus ---
+        // --- (SỬA LỖI: Thêm listener cho focus lost) ---
         keyField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
             if (wasFocused && !isFocused) { // Focus Lost
                 viewModel.handleFocusLost("key");
@@ -243,9 +243,17 @@ public class AddTagDialogController {
         for (SuggestionItem item : items) {
             ToggleButton chip = new ToggleButton(item.getName());
             chip.getStyleClass().add("suggested-tag-button");
-            if (Objects.equals(item.getType(), "Genre") || Objects.equals(item.getType(), "Tag")) {
+
+            // (SỬA LỖI BIÊN DỊCH TẠI ĐÂY)
+            // Lỗi: item.isJson() không tồn tại.
+            // Sửa: Kiểm tra type. Mặc dù chúng đều là "simple",
+            // chúng ta có thể thêm style "tag-view-simple" cho Tag và Genre (giống project cũ).
+            String type = item.getType();
+            if (Objects.equals(type, "GENRE") || Objects.equals(type, "TAG")) {
                 chip.getStyleClass().add("tag-view-simple");
             }
+            // (Không cần check JSON vì VM đã lọc ra rồi)
+
             chip.setUserData(item);
             chip.setOnAction(e -> {
                 viewModel.selectSimpleSuggestion(item);

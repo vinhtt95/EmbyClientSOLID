@@ -99,30 +99,15 @@ public class MainController {
 
     @FXML
     public void initialize() {
-        // 1. Cài đặt I18n (UR-11)
         setupLocalization();
-
-        // 2. Tải 3 cột con (UR-7)
         loadSubViews();
-
-        // 3. Binding UI chung (Toolbar, Statusbar) vào MainViewModel
         bindCommonUI();
-
-        // 4. Kết nối các ViewModels (Logic Điều phối)
         setupViewModelCoordination();
-
-        // 5. Khôi phục vị trí thanh chia (UR-8)
         loadDividerPositions();
-
-        // 6. Bắt đầu tải cây thư viện
         if (libraryTreeController != null) {
             libraryTreeController.loadLibraries();
         }
-
-        // 7. (MỚI - GĐ 12/UR-13) Đăng ký Hotkeys
         registerHotkeys();
-
-        // 8. Kích hoạt "Home" khi khởi động
         Platform.runLater(this::handleHomeButtonAction);
     }
 
@@ -174,7 +159,7 @@ public class MainController {
     }
 
     /**
-     * (SỬA ĐỔI GĐ 11/12: Thêm logic trả focus).
+     * (SỬA ĐỔI GĐ 11/12: Sửa lỗi focus).
      */
     private void setupViewModelCoordination() {
 
@@ -227,7 +212,7 @@ public class MainController {
                 AddTagResult result = appNavigator.showAddTagDialog(ownerStage, newCtx);
 
                 // --- SỬA LỖI FOCUS (UR-13) ---
-                // Sau khi dialog (showAndWait) đóng, trả focus về rootPane
+                // Ngay sau khi dialog (showAndWait) đóng, trả focus về rootPane
                 // để phím Enter có thể hoạt động ngay lập tức.
                 Platform.runLater(() -> rootPane.requestFocus());
                 // --- KẾT THÚC SỬA LỖI ---
@@ -308,7 +293,6 @@ public class MainController {
      * (MỚI - GĐ 12/UR-13) Đăng ký phím tắt cho Scene.
      */
     private void registerHotkeys() {
-        // Chúng ta phải đợi Stage hiển thị để lấy Scene
         Platform.runLater(() -> {
             Scene scene = rootPane.getScene();
             if (scene == null) {
@@ -322,22 +306,19 @@ public class MainController {
 
                     Node focusedNode = scene.getFocusOwner();
 
-                    // Kiểm tra xem focus có đang ở trên một control "chặn" (như text field, button) không
                     boolean isBlockingControl = focusedNode instanceof javafx.scene.control.TextInputControl ||
                             focusedNode instanceof javafx.scene.control.Button ||
                             focusedNode instanceof javafx.scene.control.ToggleButton;
 
-                    // Chỉ kích hoạt nếu focus không nằm trên các control đó
                     if (focusedNode == null || !isBlockingControl) {
                         if (itemDetailViewModel != null) {
-                            // (Logic từ ItemDetailController cũ: handleRepeatAddTagDialog)
                             itemDetailViewModel.repeatAddChipCommand();
                             event.consume();
                         }
                     }
                 }
 
-                // (Các hotkey khác của GĐ 12 như Cmd+S, Cmd+N sẽ được thêm ở đây)
+                // (Các hotkey khác của GĐ 12 sẽ được thêm ở đây)
 
             });
         });

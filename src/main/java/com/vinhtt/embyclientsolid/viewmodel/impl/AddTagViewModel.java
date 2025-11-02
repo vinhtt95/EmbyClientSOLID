@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 
 /**
  * Triển khai (Implementation) của IAddTagViewModel.
- * (Cập nhật: Sửa lỗi .clear() VÀ port logic auto-complete (focus lost)).
+ * (Cập nhật: Sửa lỗi logic tải gợi ý cho Studio/Genre/People).
  */
 public class AddTagViewModel implements IAddTagViewModel {
 
@@ -146,42 +146,51 @@ public class AddTagViewModel implements IAddTagViewModel {
         }
     }
 
+    /**
+     * Tải dữ liệu gợi ý từ Repository (chạy nền).
+     * (SỬA LỖI LOGIC TẠI ĐÂY)
+     */
     private void loadSuggestedTags() {
         new Thread(() -> {
             try {
+                // 1. Tải dữ liệu thô (List<Tag>)
                 List<Tag> allRawTags = new ArrayList<>();
-                List<SuggestionItem> simpleSuggestions = new ArrayList<>();
 
                 switch (currentContext) {
                     case TAG:
                         allRawTags.addAll(staticDataRepository.getAllUsedTags());
                         break;
                     case STUDIO:
-                        simpleSuggestions.addAll(staticDataRepository.getStudioSuggestions());
+                        // (SỬA LỖI: Gọi hàm trả về List<Tag>)
+                        allRawTags.addAll(staticDataRepository.getStudioSuggestions());
                         break;
                     case PEOPLE:
-                        simpleSuggestions.addAll(staticDataRepository.getPeopleSuggestions());
+                        // (SỬA LỖI: Gọi hàm trả về List<Tag>)
+                        allRawTags.addAll(staticDataRepository.getPeopleSuggestions());
                         break;
                     case GENRE:
-                        simpleSuggestions.addAll(staticDataRepository.getGenreSuggestions());
+                        // (SỬA LỖI: Gọi hàm trả về List<Tag>)
+                        allRawTags.addAll(staticDataRepository.getGenreSuggestions());
                         break;
                 }
 
+                // 2. Xử lý dữ liệu thô (Logic này giờ đúng cho TẤT CẢ context)
                 Map<String, List<Tag>> tempJsonGroups = allRawTags.stream()
                         .filter(Tag::isJson)
                         .collect(Collectors.groupingBy(Tag::getKey));
 
-                if (currentContext == SuggestionContext.TAG) {
-                    List<SuggestionItem> simpleTagsFromJson = allRawTags.stream()
-                            .filter(t -> !t.isJson())
-                            .map(t -> new SuggestionItem(t.getDisplayName(), t.getId(), "Tag"))
-                            .collect(Collectors.toList());
-                    simpleSuggestions.addAll(simpleTagsFromJson);
-                }
+                List<SuggestionItem> simpleSuggestions = allRawTags.stream()
+                        .filter(t -> !t.isJson())
+                        .map(t -> new SuggestionItem(t.getDisplayName(), t.getId(), currentContext.name())) // Dùng context.name() làm Type
+                        .collect(Collectors.toList());
 
+
+                // 3. Cập nhật UI (trên luồng JavaFX)
                 Platform.runLater(() -> {
                     this.jsonGroups = tempJsonGroups;
-                    this.allSimpleSuggestions = simpleSuggestions;
+                    this.allSimpleSuggestions = simpleSuggestions.stream().distinct().collect(Collectors.toList());
+
+                    // 4. Populate lần đầu
                     isUpdatingProgrammatically = true;
                     populateKeys(key.get());
                     populateSimpleTags(simpleName.get());
@@ -194,7 +203,7 @@ public class AddTagViewModel implements IAddTagViewModel {
         }).start();
     }
 
-    // --- Logic Lọc Gợi ý ---
+    // --- Logic Lọc Gợi ý (Không cần thay đổi) ---
 
     private void populateKeys(String searchText) {
         List<String> filteredKeys;
@@ -208,7 +217,6 @@ public class AddTagViewModel implements IAddTagViewModel {
         }
         Collections.sort(filteredKeys, String.CASE_INSENSITIVE_ORDER);
         suggestionKeys.setAll(filteredKeys);
-        // Tự động cập nhật value suggestions dựa trên key hiện tại (ngay cả khi chưa chọn)
         populateValues(key.get(), value.get());
     }
 
@@ -262,19 +270,17 @@ public class AddTagViewModel implements IAddTagViewModel {
     }
 
     /**
-     * (MỚI - SỬA LỖI) Xử lý logic auto-complete khi mất focus (blur).
+     * (MỚI) Xử lý logic auto-complete khi mất focus (blur).
      */
     @Override
     public void handleFocusLost(String sourceField) {
         if (isUpdatingProgrammatically) return;
 
-        // Đây là logic auto-complete mà bạn đã chỉ ra
         if ("key".equals(sourceField) && focusedKeyIndex.get() == -1) {
             String currentKeyText = key.get().trim();
             if (!currentKeyText.isEmpty()) {
                 String correctCaseKey = null;
                 int matchIndex = -1;
-                // Tìm trong danh sách gợi ý *hiện tại*
                 for (int i = 0; i < suggestionKeys.size(); i++) {
                     String toggleKey = suggestionKeys.get(i);
                     if (toggleKey.equalsIgnoreCase(currentKeyText)) {
@@ -294,6 +300,7 @@ public class AddTagViewModel implements IAddTagViewModel {
                 }
             }
         }
+        // (Không cần logic focus lost cho value/simple)
     }
 
 
@@ -347,37 +354,25 @@ public class AddTagViewModel implements IAddTagViewModel {
 
     private void handleTabKey(String sourceField) {
         if ("key".equals(sourceField)) {
-            // Auto-chọn key nếu đang focus chip
             if (focusedKeyIndex.get() != -1) {
                 selectKeySuggestion(suggestionKeys.get(focusedKeyIndex.get()));
             } else {
-                // (LOGIC MỚI) Nếu không focus chip, chạy logic auto-complete y như focus lost
                 handleFocusLost("key");
             }
-            // (Controller sẽ chuyển focus qua valueField)
         } else if ("value".equals(sourceField)) {
-            // Auto-chọn value nếu đang focus chip
             if (focusedValueIndex.get() != -1) {
                 selectValueSuggestion(suggestionValues.get(focusedValueIndex.get()));
             }
-            // (Controller sẽ chuyển focus qua okButton)
         } else if ("simple".equals(sourceField)) {
-            // Chuyển từ Simple -> JSON
             String currentSimpleText = simpleName.get();
             isUpdatingProgrammatically = true;
-            simpleMode.set(false); // Chuyển radio
+            simpleMode.set(false);
             key.set(currentSimpleText);
-
-            // --- SỬA LỖI 1 ---
-            simpleName.set(""); // Dùng .set("")
-            value.set("");      // Dùng .set("")
-            // --- KẾT THÚC SỬA LỖI 1 ---
-
+            simpleName.set("");
+            value.set("");
             isUpdatingProgrammatically = false;
-
             populateKeys(currentSimpleText);
             populateSimpleTags(currentSimpleText);
-            // (Controller sẽ chuyển focus qua keyField)
         }
     }
 
@@ -398,16 +393,10 @@ public class AddTagViewModel implements IAddTagViewModel {
                         isUpdatingProgrammatically = true;
                         simpleMode.set(true);
                         simpleName.set(keyText);
-
-                        // --- SỬA LỖI 2 ---
-                        key.set("");   // Dùng .set("")
-                        value.set(""); // Dùng .set("")
-                        // --- KẾT THÚC SỬA LỖI 2 ---
-
+                        key.set("");
+                        value.set("");
                         isUpdatingProgrammatically = false;
-
                         populateSimpleTags(keyText);
-                        // (Controller sẽ chuyển focus)
                     } else {
                         cancelCommand();
                     }
@@ -422,7 +411,6 @@ public class AddTagViewModel implements IAddTagViewModel {
             }
         }
     }
-
 
     @Override
     public void selectKeySuggestion(String key) {
@@ -466,6 +454,7 @@ public class AddTagViewModel implements IAddTagViewModel {
             String k = key.get();
             String v = value.get();
             if (k != null && !k.trim().isEmpty() && v != null && !v.trim().isEmpty()) {
+                // (SỬA LỖI LOGIC: Khi tạo JSON thủ công, ID luôn là null)
                 this.result = new AddTagResult(new Tag(k.trim(), v.trim(), null));
             }
         }

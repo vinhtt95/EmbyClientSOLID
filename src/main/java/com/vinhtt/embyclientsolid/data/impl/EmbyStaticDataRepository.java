@@ -17,13 +17,12 @@ import embyclient.model.UserLibraryTagItem;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
  * Triển khai (Implementation) của IStaticDataRepository.
- * Chịu trách nhiệm đọc dữ liệu tĩnh/gợi ý.
- * Logic được chuyển từ RequestEmby.java
- * và ItemRepository.java cũ.
+ * (Cập nhật: Sửa logic để parse Name (có thể là JSON) cho TẤT CẢ các loại).
  */
 public class EmbyStaticDataRepository implements IStaticDataRepository {
 
@@ -37,50 +36,57 @@ public class EmbyStaticDataRepository implements IStaticDataRepository {
         this.apiClient = sessionService.getApiClient();
     }
 
+    /**
+     * Helper chung để parse DTOs sang List<Tag>.
+     * Đây là logic cốt lõi bạn yêu cầu.
+     */
+    private List<Tag> parseDtoListToTagList(List<BaseItemDto> dtoList) {
+        if (dtoList == null) return Collections.emptyList();
+
+        return dtoList.stream()
+                // (SỬA LỖI: Lấy cả ID gốc từ DTO)
+                .map(dto -> Tag.parse(dto.getName(), dto.getId())) // Parse Name (có thể là JSON) và giữ ID
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
     @Override
     public List<Tag> getAllUsedTags() throws ApiException {
         TagServiceApi tagServiceApi = new TagServiceApi(apiClient);
-        // Logic từ RequestEmby.getListTagsItem
         QueryResultUserLibraryTagItem listTag = tagServiceApi.getTags(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         if (listTag != null && listTag.getItems() != null) {
             return listTag.getItems().stream()
-                    .map(UserLibraryTagItem::getName)
+                    .map(UserLibraryTagItem::getName) // Lấy Name
                     .filter(name -> name != null && !name.isEmpty())
                     .distinct()
-                    .map(rawName -> Tag.parse(rawName, null)) // Chuyển đổi sang Model mới
+                    .map(rawName -> Tag.parse(rawName, null)) // Parse Name (có thể là JSON)
                     .collect(Collectors.toList());
         }
         return Collections.emptyList();
     }
 
     @Override
-    public List<SuggestionItem> getGenreSuggestions() throws ApiException {
+    public List<Tag> getGenreSuggestions() throws ApiException {
         GenresServiceApi genresServiceApi = new GenresServiceApi(apiClient);
-        // Logic từ RequestEmby.getListGenres
         QueryResultBaseItemDto genreResult = genresServiceApi.getGenres(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
-        List<BaseItemDto> dtoList = (genreResult != null) ? genreResult.getItems() : null;
-        return SuggestionItem.fromBaseItemDtoList(dtoList); // Dùng model mới
+        return parseDtoListToTagList(genreResult != null ? genreResult.getItems() : null);
     }
 
     @Override
-    public List<SuggestionItem> getStudioSuggestions() throws ApiException {
+    public List<Tag> getStudioSuggestions() throws ApiException {
         StudiosServiceApi studiosServiceApi = new StudiosServiceApi(apiClient);
-        // Logic từ RequestEmby.getListStudio
         QueryResultBaseItemDto resultBaseItemDto = studiosServiceApi.getStudios(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
-        List<BaseItemDto> dtoList = (resultBaseItemDto != null) ? resultBaseItemDto.getItems() : null;
-        return SuggestionItem.fromBaseItemDtoList(dtoList); // Dùng model mới
+        return parseDtoListToTagList(resultBaseItemDto != null ? resultBaseItemDto.getItems() : null);
     }
 
     @Override
-    public List<SuggestionItem> getPeopleSuggestions() throws ApiException {
+    public List<Tag> getPeopleSuggestions() throws ApiException {
         PersonsServiceApi personsServiceApi = new PersonsServiceApi(apiClient);
-        // Logic từ RequestEmby.getListPeoples
         QueryResultBaseItemDto resultBaseItemDto = personsServiceApi.getPersons(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
-        List<BaseItemDto> dtoList = (resultBaseItemDto != null) ? resultBaseItemDto.getItems() : null;
-        return SuggestionItem.fromBaseItemDtoList(dtoList); // Dùng model mới
+        return parseDtoListToTagList(resultBaseItemDto != null ? resultBaseItemDto.getItems() : null);
     }
 }
