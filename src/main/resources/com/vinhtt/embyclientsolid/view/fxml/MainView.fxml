@@ -50,13 +50,13 @@
         <SplitPane fx:id="mainSplitPane" prefHeight="160.0" prefWidth="200.0" BorderPane.alignment="CENTER">
             <items>
                 <AnchorPane fx:id="leftPaneContainer"
-                            maxWidth="500.0" minWidth="200.0" prefWidth="300.0"
+                            maxWidth="300.0" minWidth="300.0" prefWidth="300.0"
                             style="-fx-background-color: #1e1e1e;" />
                 <AnchorPane fx:id="centerPaneContainer"
                             minWidth="400.0" prefWidth="1000.0"
                             style="-fx-background-color: #1a1a1a;" />
                 <AnchorPane fx:id="rightPaneContainer"
-                            maxWidth="858.0" minWidth="400.0" prefWidth="700.0"
+                            maxWidth="855.0" minWidth="855.0" prefWidth="855.0"
                             style="-fx-background-color: #121212;" />
             </items>
         </SplitPane>

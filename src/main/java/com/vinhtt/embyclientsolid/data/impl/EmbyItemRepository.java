@@ -136,8 +136,6 @@ public class EmbyItemRepository implements IItemRepository {
 
     @Override
     public QueryResultBaseItemDto getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive, String sortOrder, String sortBy) throws ApiException {
-        System.out.println(chip.toString() + "Type: " + chipType.toString());
-        // --- LOGIC MỚI (LẦN 5) - Sửa lại Studio theo yêu cầu của ông ---
         String apiParam;
         QueryResultBaseItemDto listItems = null;
 
