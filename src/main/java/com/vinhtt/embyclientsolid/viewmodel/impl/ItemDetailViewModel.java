@@ -418,29 +418,35 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                 }
 
                 List<Tag> tagsFromPerson = new ArrayList<>();
-                Tag personTag = null; // Đây là tag của chính diễn viên đó
+                // Tag đại diện cho người này (sẽ được thêm vào peopleItems)
+                Tag actorTagToAlwaysAdd = null;
 
                 if (info.getActressName() != null && !info.getActressName().isEmpty()) {
+                    String actorName = info.getActressName();
 
-                    // 1. Lấy List<Tag> thay vì List<SuggestionItem>
+                    // 1. TÌM KIẾM TRONG REPO (Vẫn cần để lấy Tags của người đó)
                     List<Tag> peopleTags = staticDataRepository.getPeopleSuggestions();
-
-                    // 2. Lọc List<Tag> bằng getDisplayName()
-                    Tag personTagResult = peopleTags.stream()
-                            .filter(p -> info.getActressName().equalsIgnoreCase(p.getDisplayName()))
+                    Tag personTagResultFromRepo = peopleTags.stream()
+                            .filter(p -> actorName.equalsIgnoreCase(p.getDisplayName()))
                             .findFirst().orElse(null);
-                    // --- KẾT THÚC SỬA LỖI ---
 
-                    if (personTagResult != null) {
-                        BaseItemDto personDto = itemRepository.getFullItemDetails(personTagResult.getId());
+                    if (personTagResultFromRepo != null) {
+                        // NẾU tìm thấy trong repo:
+                        //   - Dùng tag có sẵn (có ID) để thêm vào People.
+                        //   - Lấy tags từ người đó để merge.
+                        BaseItemDto personDto = itemRepository.getFullItemDetails(personTagResultFromRepo.getId());
                         if (personDto != null && personDto.getTagItems() != null) {
                             tagsFromPerson.addAll(parseNameLongIdPair(personDto.getTagItems()));
                         }
-                        personTag = personTagResult; // Gán Tag tìm được
+                        actorTagToAlwaysAdd = personTagResultFromRepo;
+                    } else {
+                        // NẾU KHÔNG tìm thấy trong repo:
+                        //   - Tạo Tag đơn giản (không ID) từ tên để thêm vào People.
+                        actorTagToAlwaysAdd = Tag.parse(actorName, null);
                     }
                 }
 
-                final Tag finalPersonTag = personTag;
+                final Tag finalActorTagToAlwaysAdd = actorTagToAlwaysAdd;
                 Platform.runLater(() -> {
                     if (info.getReleaseDate() != null) {
                         releaseDate.set(dateToString(info.getReleaseDate()));
@@ -451,9 +457,14 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                                 .filter(t -> !existingTags.contains(t))
                                 .collect(Collectors.toList()));
                     }
-                    if (finalPersonTag != null && !peopleItems.contains(finalPersonTag)) {
-                        peopleItems.add(finalPersonTag);
+
+                    // --- LOGIC MỚI: LUÔN THÊM ACTOR VÀO PEOPLE NẾU CÓ TÊN ---
+                    // Thêm actorTagToAlwaysAdd (dù là Tag có ID hay Tag mới không ID) nếu chưa tồn tại
+                    if (finalActorTagToAlwaysAdd != null && !peopleItems.contains(finalActorTagToAlwaysAdd)) {
+                        peopleItems.add(finalActorTagToAlwaysAdd);
                     }
+                    // --- KẾT THÚC LOGIC MỚI ---
+
                     notificationService.showStatus(configService.getString("itemDetailView", "statusFetchDateSuccess"));
                     loading.set(false);
                 });
