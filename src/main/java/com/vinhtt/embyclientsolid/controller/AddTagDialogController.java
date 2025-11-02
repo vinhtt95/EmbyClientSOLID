@@ -94,6 +94,7 @@ public class AddTagDialogController {
         titleLabel.textProperty().bind(viewModel.titleProperty());
         contentLabel.textProperty().bind(viewModel.simpleLabelProperty());
         suggestionSimpleLabel.textProperty().bind(viewModel.simpleSuggestionLabelProperty());
+        simpleTagRadio.textProperty().bind(viewModel.simpleLabelProperty());
 
         // (Lấy I18n từ ConfigService)
         keyLabel.setText(configService.getString("addTagDialog", "keyLabel"));

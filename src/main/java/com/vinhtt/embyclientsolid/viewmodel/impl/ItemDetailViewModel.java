@@ -416,7 +416,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
                 if (info.getActressName() != null && !info.getActressName().isEmpty()) {
 
-                    // --- SỬA LỖI BIÊN DỊCH (UR-38) ---
                     // 1. Lấy List<Tag> thay vì List<SuggestionItem>
                     List<Tag> peopleTags = staticDataRepository.getPeopleSuggestions();
 

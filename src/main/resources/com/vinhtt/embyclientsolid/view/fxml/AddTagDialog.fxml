@@ -96,19 +96,19 @@
         </children>
     </VBox>
 
-    <VBox spacing="5.0" style="-fx-padding: 10 0 0 0;">
-        <Label fx:id="copyIdLabel" text="Sao chép nhanh từ ID:"/>
-        <HBox spacing="10.0">
-            <TextField fx:id="copyIdField" HBox.hgrow="ALWAYS"/>
-            <Button fx:id="copyButton"/>
-        </HBox>
-        <Label fx:id="copyStatusLabel" style="-fx-font-size: 12px; -fx-font-style: italic;"/>
-    </VBox>
-
-    <Region VBox.vgrow="NEVER" minHeight="10.0"/>
-
-    <HBox alignment="CENTER_RIGHT" spacing="10.0">
+    <HBox alignment="CENTER_LEFT" spacing="10.0">
         <children>
+            <VBox spacing="5.0" HBox.hgrow="ALWAYS">
+                <Label fx:id="copyIdLabel" text="Sao chép nhanh từ ID:"/>
+                <HBox spacing="10.0">
+                    <TextField fx:id="copyIdField" HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="copyButton"/>
+                </HBox>
+                <Label fx:id="copyStatusLabel" style="-fx-font-size: 12px; -fx-font-style: italic;"/>
+            </VBox>
+
+            <Region HBox.hgrow="ALWAYS" />
+
             <Button fx:id="cancelButton" onAction="#handleCancel" HBox.hgrow="NEVER" text="Hủy"/>
             <Button fx:id="okButton" onAction="#handleOk" defaultButton="true" HBox.hgrow="NEVER" text="Đồng ý"/>
         </children>
