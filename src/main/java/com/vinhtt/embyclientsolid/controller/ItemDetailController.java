@@ -454,8 +454,14 @@ public class ItemDetailController {
             if (file != null) viewModel.importAndPreview(file);
         });
         exportButton.setOnAction(e -> {
-            File file = jsonFileHandler.showSaveJsonDialog(getStage(), "item.json"); // (Cần tên file động)
-            if (file != null) viewModel.exportCommand(file);
+            String rawName = viewModel.getExportFileName();
+            // Xử lý tên file (thay thế các ký tự không hợp lệ)
+            String initialFileName = (rawName != null ? rawName.replaceAll("[^a-zA-Z0-9.-]", "_") : "item") + ".json";
+
+            File file = jsonFileHandler.showSaveJsonDialog(getStage(), initialFileName);
+            if (file != null) {
+                viewModel.exportCommand(file);
+            }
         });
 
         // (MỚI) Commands Accept/Reject (UR-47)

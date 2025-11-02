@@ -98,6 +98,7 @@ public interface IItemDetailViewModel {
      * (UR-47).
      */
     void markAsDirtyByAccept();
+    String getExportFileName();
 
     /**
      * Lớp POJO cho sự kiện click chip (UR-36).

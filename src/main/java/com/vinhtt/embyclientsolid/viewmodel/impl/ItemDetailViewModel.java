@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.io.File;
 
 /**
  * Triển khai (Implementation) của IItemDetailViewModel (Cột 3).
@@ -117,11 +118,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         // (UR-42: Kích hoạt nút Lưu ảnh)
         newPrimaryImageFile.addListener((obs, oldVal, newVal) -> primaryImageDirty.set(newVal != null));
     }
-
-    /**
-     * (XÓA BỎ) Hàm setupDirtyTracking() cũ
-     * (logic này giờ nằm trong ItemDetailDirtyTracker.java)
-     */
 
     @Override
     public void loadItem(BaseItemDto item) {
@@ -748,7 +744,19 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         dirtyTracker.forceDirty();
     }
 
-    // --- Event (UR-36) ---
+    @Override
+    public String getExportFileName() {
+        // (UR-44) Lấy Original Title, nếu rỗng thì lấy Title
+        String name = originalTitle.get();
+        if (name == null || name.trim().isEmpty()) {
+            name = title.get();
+        }
+        if (name == null || name.trim().isEmpty()) {
+            return "item"; // Fallback an toàn
+        }
+        return name;
+    }
+
     @Override
     public void clearChipClickEvent() {
         chipClickEvent.set(null);
