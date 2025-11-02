@@ -219,6 +219,7 @@ public class AddTagDialogController {
             chip.getStyleClass().add("suggestion-key-button");
             chip.setUserData(key);
             chip.setOnAction(e -> {
+                ensureSingleSelection(pane, chip);
                 viewModel.selectKeySuggestion(key);
                 valueField.requestFocus();
             });
@@ -233,6 +234,7 @@ public class AddTagDialogController {
             chip.getStyleClass().addAll("suggested-tag-button", "tag-view-json");
             chip.setUserData(tag);
             chip.setOnAction(e -> {
+                ensureSingleSelection(pane, chip);
                 viewModel.selectValueSuggestion(tag);
                 okButton.requestFocus();
             });
@@ -258,6 +260,7 @@ public class AddTagDialogController {
 
             chip.setUserData(item);
             chip.setOnAction(e -> {
+                ensureSingleSelection(pane, chip);
                 viewModel.selectSimpleSuggestion(item);
                 okButton.requestFocus();
             });
@@ -331,5 +334,21 @@ public class AddTagDialogController {
     @FXML
     private void handleCancel() {
         viewModel.cancelCommand();
+    }
+
+    /**
+     * Helper đảm bảo chỉ có một ToggleButton trong FlowPane được chọn (setSelected(true)).
+     */
+    private void ensureSingleSelection(FlowPane pane, ToggleButton selectedButton) {
+        Platform.runLater(() -> {
+            for (Node node : pane.getChildren()) {
+                if (node instanceof ToggleButton && node != selectedButton) {
+                    // Buộc tất cả các nút khác phải bị bỏ chọn
+                    ((ToggleButton) node).setSelected(false);
+                }
+            }
+            // Đảm bảo nút hiện tại được chọn (phòng trường hợp người dùng click để bỏ chọn)
+            selectedButton.setSelected(true);
+        });
     }
 }
