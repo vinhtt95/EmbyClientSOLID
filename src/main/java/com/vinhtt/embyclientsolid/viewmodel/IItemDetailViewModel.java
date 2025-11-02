@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * Interface cho ItemDetailViewModel (Cột 3).
- * (Cập nhật: Thêm fireChipClickEvent và getBackdropUrl).
+ * (Cập nhật GĐ 10: Thêm các hàm/props cho Import/Export).
  */
 public interface IItemDetailViewModel {
 
@@ -41,6 +41,9 @@ public interface IItemDetailViewModel {
     // --- Trạng thái Dirty/Import (Binding) ---
     ReadOnlyBooleanProperty isDirtyProperty();
     ReadOnlyBooleanProperty primaryImageDirtyProperty();
+    /**
+     * (MỚI) Các property để hiển thị nút (✓/✗) (UR-46).
+     */
     ReadOnlyBooleanProperty showTitleReviewProperty();
     ReadOnlyBooleanProperty showOverviewReviewProperty();
     ReadOnlyBooleanProperty showReleaseDateReviewProperty();
@@ -54,21 +57,7 @@ public interface IItemDetailViewModel {
     // --- Sự kiện (Event) ---
     ReadOnlyObjectProperty<ChipClickEvent> chipClickEventProperty();
     void clearChipClickEvent();
-
-    /**
-     * (SỬA LỖI 1: Thêm phương thức này vào Interface).
-     * Kích hoạt sự kiện khi một chip được nhấn.
-     * @param model Tag model của chip.
-     * @param type Loại chip ("TAG", "STUDIO", v.v.)
-     */
     void fireChipClickEvent(Tag model, String type);
-
-    /**
-     * (SỬA LỖI 2: Thêm phương thức này vào Interface).
-     * Lấy URL đầy đủ cho một ảnh backdrop.
-     * @param info ImageInfo của backdrop.
-     * @return URL đầy đủ.
-     */
     String getBackdropUrl(ImageInfo info);
 
     // --- Hành động (Commands) ---
@@ -99,11 +88,16 @@ public interface IItemDetailViewModel {
     void removeGenre(Tag tag);
     void removePeople(Tag tag);
 
-    // Commands Import/Export
+    // --- (MỚI) Commands Import/Export (UR-44, 45, 47) ---
     void importAndPreview(File file);
     void exportCommand(File file);
     void acceptImportField(String fieldName);
     void rejectImportField(String fieldName);
+    /**
+     * (MỚI) Được gọi bởi ImportHandler khi nhấn Accept (✓).
+     * (UR-47).
+     */
+    void markAsDirtyByAccept();
 
     /**
      * Lớp POJO cho sự kiện click chip (UR-36).

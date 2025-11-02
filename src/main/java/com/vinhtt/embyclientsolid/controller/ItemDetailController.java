@@ -2,12 +2,14 @@ package com.vinhtt.embyclientsolid.controller;
 
 import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import com.vinhtt.embyclientsolid.model.Tag;
+import com.vinhtt.embyclientsolid.services.JsonFileHandler;
 import com.vinhtt.embyclientsolid.view.controls.BackdropChip;
 import com.vinhtt.embyclientsolid.view.controls.TagChip;
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import embyclient.model.ImageInfo;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -35,7 +37,7 @@ import java.util.stream.Collectors;
 
 /**
  * Controller cho ItemDetailView.fxml (Cột 3).
- * (Cập nhật: Sửa lỗi 1, 2, 3).
+ * (Cập nhật GĐ 10: Binding các nút Review (✓/✗) ).
  */
 public class ItemDetailController {
 
@@ -87,10 +89,39 @@ public class ItemDetailController {
     @FXML private Button importButton;
     @FXML private Button exportButton;
 
-    // (Các nút Review (v/x) được FXML định nghĩa nhưng tạm thời ẩn đi)
+    // (MỚI) FXML fields cho các nút Review (✓/✗) (UR-46)
+    @FXML private HBox reviewTitleContainer;
+    @FXML private Button acceptTitleButton;
+    @FXML private Button rejectTitleButton;
+    @FXML private HBox reviewCriticRatingContainer;
+    @FXML private Button acceptCriticRatingButton;
+    @FXML private Button rejectCriticRatingButton;
+    @FXML private HBox reviewOverviewContainer;
+    @FXML private Button acceptOverviewButton;
+    @FXML private Button rejectOverviewButton;
+    @FXML private HBox reviewReleaseDateContainer;
+    @FXML private Button acceptReleaseDateButton;
+    @FXML private Button rejectReleaseDateButton;
+    @FXML private HBox reviewOriginalTitleContainer;
+    @FXML private Button acceptOriginalTitleButton;
+    @FXML private Button rejectOriginalTitleButton;
+    @FXML private HBox reviewTagsContainer;
+    @FXML private Button acceptTagsButton;
+    @FXML private Button rejectTagsButton;
+    @FXML private HBox reviewGenresContainer;
+    @FXML private Button acceptGenresButton;
+    @FXML private Button rejectGenresButton;
+    @FXML private HBox reviewStudiosContainer;
+    @FXML private Button acceptStudiosButton;
+    @FXML private Button rejectStudiosButton;
+    @FXML private HBox reviewPeopleContainer;
+    @FXML private Button acceptPeopleButton;
+    @FXML private Button rejectPeopleButton;
+
 
     private IItemDetailViewModel viewModel;
     private IConfigurationService configService; // Cần cho I18n
+    private JsonFileHandler jsonFileHandler;
 
     /**
      * Khởi tạo Controller.
@@ -108,7 +139,8 @@ public class ItemDetailController {
      */
     public void setViewModel(IItemDetailViewModel viewModel, IConfigurationService configService) {
         this.viewModel = viewModel;
-        this.configService = configService; // Lưu config service
+        this.configService = configService;
+        this.jsonFileHandler = new JsonFileHandler(configService);
 
         // 1. Cài đặt I18n
         setupLocalization();
@@ -116,16 +148,19 @@ public class ItemDetailController {
         // 2. Binding UI cơ bản
         bindUIState();
 
-        // 3. Binding các FlowPane (UR-34, UR-41)
+        // (MỚI) 3. Binding các nút Review (✓/✗)
+        bindReviewButtons();
+
+        // 4. Binding các FlowPane (UR-34, UR-41)
         bindFlowPanes();
 
-        // 4. Cài đặt các nút Rating (UR-32, UR-33)
+        // 5. Cài đặt các nút Rating (UR-32, UR-33)
         setupCriticRatingButtons();
 
-        // 5. Cài đặt các hành động (Commands)
+        // 6. Cài đặt các hành động (Commands)
         setupButtonActions();
 
-        // 6. Cài đặt Drag-and-Drop (UR-41, UR-42)
+        // 7. Cài đặt Drag-and-Drop (UR-41, UR-42)
         setupDragAndDrop();
     }
 
@@ -161,6 +196,28 @@ public class ItemDetailController {
         saveButton.setText(configService.getString("itemDetailView", "saveButton"));
         importButton.setText(configService.getString("itemDetailView", "importButton"));
         exportButton.setText(configService.getString("itemDetailView", "exportButton"));
+
+        // (MỚI) I18n cho các nút Review (✓/✗)
+        String acceptText = configService.getString("itemDetailView", "acceptButton");
+        String rejectText = configService.getString("itemDetailView", "rejectButton");
+        acceptTitleButton.setText(acceptText);
+        rejectTitleButton.setText(rejectText);
+        acceptCriticRatingButton.setText(acceptText);
+        rejectCriticRatingButton.setText(rejectText);
+        acceptOverviewButton.setText(acceptText);
+        rejectOverviewButton.setText(rejectText);
+        acceptReleaseDateButton.setText(acceptText);
+        rejectReleaseDateButton.setText(rejectText);
+        acceptOriginalTitleButton.setText(acceptText);
+        rejectOriginalTitleButton.setText(rejectText);
+        acceptTagsButton.setText(acceptText);
+        rejectTagsButton.setText(rejectText);
+        acceptGenresButton.setText(acceptText);
+        rejectGenresButton.setText(rejectText);
+        acceptStudiosButton.setText(acceptText);
+        rejectStudiosButton.setText(rejectText);
+        acceptPeopleButton.setText(acceptText);
+        rejectPeopleButton.setText(rejectText);
     }
 
     /**
@@ -192,7 +249,7 @@ public class ItemDetailController {
         pathTextField.textProperty().bind(viewModel.itemPathProperty());
         pathContainer.visibleProperty().bind(
                 viewModel.itemPathProperty().isNotEmpty()
-                        .and(viewModel.itemPathProperty().isNotEqualTo("Không có đường dẫn"))
+                        .and(viewModel.itemPathProperty().isNotEqualTo(configService.getString("itemDetailLoader", "noPath")))
         );
         pathContainer.managedProperty().bind(pathContainer.visibleProperty());
 
@@ -222,6 +279,32 @@ public class ItemDetailController {
     }
 
     /**
+     * (MỚI) Binding các nút (✓/✗) cho Import/Export (UR-46).
+     */
+    private void bindReviewButtons() {
+        bindReviewContainer(reviewTitleContainer, viewModel.showTitleReviewProperty());
+        bindReviewContainer(reviewCriticRatingContainer, viewModel.showCriticRatingReviewProperty());
+        bindReviewContainer(reviewOverviewContainer, viewModel.showOverviewReviewProperty());
+        bindReviewContainer(reviewReleaseDateContainer, viewModel.showReleaseDateReviewProperty());
+        bindReviewContainer(reviewOriginalTitleContainer, viewModel.showOriginalTitleReviewProperty());
+        bindReviewContainer(reviewStudiosContainer, viewModel.showStudiosReviewProperty());
+        bindReviewContainer(reviewPeopleContainer, viewModel.showPeopleReviewProperty());
+        bindReviewContainer(reviewGenresContainer, viewModel.showGenresReviewProperty());
+        bindReviewContainer(reviewTagsContainer, viewModel.showTagsReviewProperty());
+    }
+
+    /**
+     * (MỚI) Helper để binding visibility của HBox chứa nút (✓/✗).
+     */
+    private void bindReviewContainer(HBox container, ReadOnlyBooleanProperty visibilityProperty) {
+        if (container != null && visibilityProperty != null) {
+            container.visibleProperty().bind(visibilityProperty);
+            container.managedProperty().bind(visibilityProperty);
+        }
+    }
+
+
+    /**
      * Cài đặt binding cho các FlowPane.
      */
     private void bindFlowPanes() {
@@ -243,7 +326,6 @@ public class ItemDetailController {
 
     /**
      * Helper cập nhật FlowPane cho Tags/Studios/People/Genres.
-     * (SỬA LỖI 1: Gọi viewModel.fireChipClickEvent).
      */
     private void updateFlowPane(FlowPane pane, ObservableList<Tag> list, String chipType) {
         Platform.runLater(() -> {
@@ -259,7 +341,6 @@ public class ItemDetailController {
                             }
                         },
                         (model) -> { // OnClick (UR-36)
-                            // SỬA LỖI 1: Gọi phương thức trên interface
                             viewModel.fireChipClickEvent(model, chipType);
                         }
                 );
@@ -270,18 +351,14 @@ public class ItemDetailController {
 
     /**
      * Helper cập nhật Gallery ảnh nền (Backdrops).
-     * (SỬA LỖI 2 & 3: Gọi viewModel.getBackdropUrl).
      */
     private void updateImageGallery() {
         Platform.runLater(() -> {
             imageGalleryPane.getChildren().clear();
-            // SỬA LỖI 2 & 3: Không cần check/lấy item ID ở đây
             if (viewModel == null) return;
 
             for (ImageInfo imageInfo : viewModel.getBackdropImages()) {
-                // SỬA LỖI 2 & 3: Lấy URL đầy đủ từ ViewModel
                 String imageUrl = viewModel.getBackdropUrl(imageInfo);
-
                 BackdropChip chip = new BackdropChip(imageInfo, imageUrl,
                         (img) -> viewModel.deleteBackdropCommand(img) // OnDelete
                 );
@@ -304,21 +381,15 @@ public class ItemDetailController {
 
             ratingButton.setOnAction(e -> {
                 Float newRating = (float) ratingValue;
-                // Toggle (UR-32)
                 if (Objects.equals(viewModel.criticRatingProperty().get(), newRating)) {
                     newRating = null;
                 }
-
-                // Cập nhật UI ngay lập tức
                 viewModel.criticRatingProperty().set(newRating);
-
-                // (UR-33: Lưu ngay lập tức)
                 viewModel.saveCriticRatingImmediately(newRating);
             });
             criticRatingPane.getChildren().add(ratingButton);
         }
 
-        // Lắng nghe thay đổi để cập nhật CSS
         viewModel.criticRatingProperty().addListener((obs, oldVal, newVal) -> updateRatingButtonSelection(newVal));
         updateRatingButtonSelection(viewModel.criticRatingProperty().get());
     }
@@ -332,7 +403,9 @@ public class ItemDetailController {
             if (node instanceof Button) {
                 int buttonValue = (Integer) node.getUserData();
                 if (selectedValue != null && buttonValue == selectedValue) {
-                    node.getStyleClass().add("selected");
+                    if (!node.getStyleClass().contains("selected")) {
+                        node.getStyleClass().add("selected");
+                    }
                 } else {
                     node.getStyleClass().remove("selected");
                 }
@@ -356,13 +429,14 @@ public class ItemDetailController {
         // Commands Ảnh
         savePrimaryImageButton.setOnAction(e -> viewModel.saveNewPrimaryImageCommand());
         addBackdropButton.setOnAction(e -> {
-            File file = showImageFileChooser(true); // Tạm thời chọn 1 file
+            // (Tạm thời dùng FileChooser, GĐ 12 sẽ thêm Drag-Drop)
+            File file = showImageFileChooser(true);
             if (file != null) {
                 viewModel.uploadDroppedBackdropFiles(List.of(file));
             }
         });
 
-        // Commands Add Chip (UR-35)
+        // Commands Add Chip (UR-35) - (Sẽ được thay thế ở GĐ 11)
         addTagButton.setOnAction(e -> viewModel.addTagCommand());
         addStudioButton.setOnAction(e -> viewModel.addStudioCommand());
         addGenreButton.setOnAction(e -> viewModel.addGenreCommand());
@@ -374,15 +448,35 @@ public class ItemDetailController {
         cloneGenreButton.setOnAction(e -> viewModel.clonePropertiesCommand("Genres"));
         clonePeopleButton.setOnAction(e -> viewModel.clonePropertiesCommand("People"));
 
-        // Commands Import/Export (UR-44, UR-45)
+        // (MỚI) Commands Import/Export (UR-44, UR-45)
         importButton.setOnAction(e -> {
-            File file = showJsonFileChooser(true);
+            File file = jsonFileHandler.showOpenJsonDialog(getStage());
             if (file != null) viewModel.importAndPreview(file);
         });
         exportButton.setOnAction(e -> {
-            File file = showJsonFileChooser(false);
+            File file = jsonFileHandler.showSaveJsonDialog(getStage(), "item.json"); // (Cần tên file động)
             if (file != null) viewModel.exportCommand(file);
         });
+
+        // (MỚI) Commands Accept/Reject (UR-47)
+        acceptTitleButton.setOnAction(e -> viewModel.acceptImportField("title"));
+        rejectTitleButton.setOnAction(e -> viewModel.rejectImportField("title"));
+        acceptCriticRatingButton.setOnAction(e -> viewModel.acceptImportField("criticRating"));
+        rejectCriticRatingButton.setOnAction(e -> viewModel.rejectImportField("criticRating"));
+        acceptOverviewButton.setOnAction(e -> viewModel.acceptImportField("overview"));
+        rejectOverviewButton.setOnAction(e -> viewModel.rejectImportField("overview"));
+        acceptReleaseDateButton.setOnAction(e -> viewModel.acceptImportField("releaseDate"));
+        rejectReleaseDateButton.setOnAction(e -> viewModel.rejectImportField("releaseDate"));
+        acceptOriginalTitleButton.setOnAction(e -> viewModel.acceptImportField("originalTitle"));
+        rejectOriginalTitleButton.setOnAction(e -> viewModel.rejectImportField("originalTitle"));
+        acceptTagsButton.setOnAction(e -> viewModel.acceptImportField("tags"));
+        rejectTagsButton.setOnAction(e -> viewModel.rejectImportField("tags"));
+        acceptGenresButton.setOnAction(e -> viewModel.acceptImportField("genres"));
+        rejectGenresButton.setOnAction(e -> viewModel.rejectImportField("genres"));
+        acceptStudiosButton.setOnAction(e -> viewModel.acceptImportField("studios"));
+        rejectStudiosButton.setOnAction(e -> viewModel.rejectImportField("studios"));
+        acceptPeopleButton.setOnAction(e -> viewModel.acceptImportField("people"));
+        rejectPeopleButton.setOnAction(e -> viewModel.rejectImportField("people"));
     }
 
     /**
@@ -449,31 +543,27 @@ public class ItemDetailController {
     // --- Helpers (File Chooser) ---
     private File showImageFileChooser(boolean allowMultiple) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle(allowMultiple ? "Chọn ảnh Backdrop" : "Chọn ảnh Primary");
+        fileChooser.setTitle(allowMultiple ? configService.getString("itemImageUpdater", "selectBackdropsTitle") : configService.getString("itemImageUpdater", "selectPrimaryTitle"));
         fileChooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("Ảnh", "*.png", "*.jpg", "*.jpeg", "*.webp")
         );
         if (allowMultiple) {
-            // (Tạm thời chỉ trả về file đầu tiên)
             List<File> files = fileChooser.showOpenMultipleDialog(getStage());
-            return (files != null && !files.isEmpty()) ? files.get(0) : null;
+            return (files != null && !files.isEmpty()) ? files.get(0) : null; // (Tạm thời vẫn chỉ 1 file)
         } else {
             return fileChooser.showOpenDialog(getStage());
         }
     }
 
+    /**
+     * (MỚI) Helper dùng JsonFileHandler đã được inject.
+     */
     private File showJsonFileChooser(boolean isOpen) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("JSON files (*.json)", "*.json")
-        );
         if (isOpen) {
-            fileChooser.setTitle(configService.getString("jsonFileHandler", "importTitle"));
-            return fileChooser.showOpenDialog(getStage());
+            return jsonFileHandler.showOpenJsonDialog(getStage());
         } else {
-            fileChooser.setTitle(configService.getString("jsonFileHandler", "exportTitle"));
-            fileChooser.setInitialFileName("item.json");
-            return fileChooser.showSaveDialog(getStage());
+            // (Cần cải thiện tên file động)
+            return jsonFileHandler.showSaveJsonDialog(getStage(), "item.json");
         }
     }
 

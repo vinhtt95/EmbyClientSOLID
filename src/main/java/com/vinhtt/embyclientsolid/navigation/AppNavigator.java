@@ -28,7 +28,7 @@ import java.net.URL;
 
 /**
  * Triển khai (Implementation) của IAppNavigator.
- * (Cập nhật Giai đoạn 9: Tiêm sessionService vào ItemGridViewModel).
+ * (Cập nhật Giai đoạn 10: Tiêm LibraryTreeViewModel vào ItemDetailViewModel).
  */
 public class AppNavigator implements IAppNavigator {
 
@@ -101,21 +101,20 @@ public class AppNavigator implements IAppNavigator {
                     configService
             );
 
-            // 2. Tạo các ViewModel con (Tiêm đầy đủ dependencies)
+            // 2. Tạo các ViewModel con
             ILibraryTreeViewModel libraryTreeViewModel = new LibraryTreeViewModel(
                     itemRepository,
                     notificationService
             );
 
-            // --- SỬA LỖI (Vấn đề 1): Tiêm sessionService vào đây ---
             IItemGridViewModel itemGridViewModel = new ItemGridViewModel(
                     itemRepository,
                     notificationService,
-                    localInteractionService, // Cần cho PlayCommand (UR-27)
-                    sessionService // <-- THÊM THAM SỐ NÀY
+                    localInteractionService,
+                    sessionService
             );
-            // --- KẾT THÚC SỬA LỖI ---
 
+            // --- SỬA LỖI (UR-37): Tiêm libraryTreeViewModel vào đây ---
             IItemDetailViewModel itemDetailViewModel = new ItemDetailViewModel(
                     itemRepository,
                     itemUpdateService,
@@ -123,8 +122,11 @@ public class AppNavigator implements IAppNavigator {
                     externalDataService,
                     localInteractionService,
                     notificationService,
-                    sessionService // Cần cho build Image URL
+                    sessionService,
+                    libraryTreeViewModel,
+                    configService
             );
+            // --- KẾT THÚC SỬA LỖI ---
 
             // 3. Tạo MainController (View-Coordinator) và tiêm MỌI THỨ
             MainController controller = new MainController(

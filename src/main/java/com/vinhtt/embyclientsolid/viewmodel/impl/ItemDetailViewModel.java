@@ -1,18 +1,26 @@
 package com.vinhtt.embyclientsolid.viewmodel.impl;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.vinhtt.embyclientsolid.core.*;
 import com.vinhtt.embyclientsolid.data.*;
+import com.vinhtt.embyclientsolid.model.LibraryTreeItem;
 import com.vinhtt.embyclientsolid.model.ReleaseInfo;
 import com.vinhtt.embyclientsolid.model.SuggestionItem;
 import com.vinhtt.embyclientsolid.model.Tag;
+import com.vinhtt.embyclientsolid.services.JsonFileHandler;
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
+import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
+import embyclient.JSON;
 import embyclient.model.*;
 import javafx.application.Platform;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.TreeItem;
 import javafx.scene.image.Image;
 import javafx.collections.ListChangeListener;
+import javafx.stage.Stage;
 
 import java.io.File;
 import java.text.ParseException;
@@ -29,7 +37,7 @@ import java.util.stream.Collectors;
 
 /**
  * Triển khai (Implementation) của IItemDetailViewModel (Cột 3).
- * (Cập nhật: Sửa lỗi 1 và 2).
+ * (Cập nhật GĐ 10: Hoàn thiện Clone, Import/Export).
  */
 public class ItemDetailViewModel implements IItemDetailViewModel {
 
@@ -40,7 +48,15 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private final IExternalDataService externalDataService;
     private final ILocalInteractionService localInteractionService;
     private final INotificationService notificationService;
-    private final IEmbySessionService sessionService; // (Cần cho URL ảnh)
+    private final IEmbySessionService sessionService;
+    private final ILibraryTreeViewModel libraryTreeViewModel; // (MỚI: Cho UR-37 Clone)
+    private final IConfigurationService configService; // (MỚI: Cho UR-44/45)
+
+    // --- Helpers (MỚI) ---
+    private final ItemDetailDirtyTracker dirtyTracker;
+    private final ItemDetailImportHandler importHandler;
+    private final JsonFileHandler jsonFileHandler;
+    private final Gson gson; // (MỚI: Dùng để clone DTO)
 
     // --- Trạng thái nội bộ ---
     private BaseItemDto originalItemDto;
@@ -68,10 +84,9 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private final ObservableList<Tag> genreItems = FXCollections.observableArrayList();
 
     // --- Trạng thái Dirty/Import (UR-46, UR-48) ---
-    private final BooleanProperty isDirty = new SimpleBooleanProperty(false);
+    // (isDirty giờ được quản lý bởi dirtyTracker)
     private final ObjectProperty<File> newPrimaryImageFile = new SimpleObjectProperty<>(null);
     private final ReadOnlyBooleanWrapper primaryImageDirty = new ReadOnlyBooleanWrapper(false);
-    // (Các property cho review (v/x) sẽ được thêm sau)
 
     // --- Sự kiện (Event) ---
     private final ReadOnlyObjectWrapper<ChipClickEvent> chipClickEvent = new ReadOnlyObjectWrapper<>(null);
@@ -79,7 +94,8 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     public ItemDetailViewModel(IItemRepository itemRepository, IItemUpdateService itemUpdateService,
                                IStaticDataRepository staticDataRepository, IExternalDataService externalDataService,
                                ILocalInteractionService localInteractionService, INotificationService notificationService,
-                               IEmbySessionService sessionService) {
+                               IEmbySessionService sessionService, ILibraryTreeViewModel libraryTreeViewModel,
+                               IConfigurationService configService) { // (Thêm tham số mới)
         this.itemRepository = itemRepository;
         this.itemUpdateService = itemUpdateService;
         this.staticDataRepository = staticDataRepository;
@@ -87,28 +103,25 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         this.localInteractionService = localInteractionService;
         this.notificationService = notificationService;
         this.sessionService = sessionService;
+        this.libraryTreeViewModel = libraryTreeViewModel; // (MỚI)
+        this.configService = configService; // (MỚI)
 
-        // (UR-48: Kích hoạt nút Save nếu có thay đổi)
-        setupDirtyTracking();
+        // (MỚI) Khởi tạo các helper
+        this.dirtyTracker = new ItemDetailDirtyTracker(this);
+        this.importHandler = new ItemDetailImportHandler(this, this.dirtyTracker);
+        this.jsonFileHandler = new JsonFileHandler(configService);
+        this.gson = new GsonBuilder()
+                .registerTypeAdapter(OffsetDateTime.class, new JSON.OffsetDateTimeTypeAdapter())
+                .create();
+
         // (UR-42: Kích hoạt nút Lưu ảnh)
         newPrimaryImageFile.addListener((obs, oldVal, newVal) -> primaryImageDirty.set(newVal != null));
     }
 
     /**
-     * Cài đặt theo dõi thay đổi (dirty tracking) cho UR-48.
+     * (XÓA BỎ) Hàm setupDirtyTracking() cũ
+     * (logic này giờ nằm trong ItemDetailDirtyTracker.java)
      */
-    private void setupDirtyTracking() {
-        // (Đây là phiên bản đơn giản, logic phức tạp hơn (Import/Export) sẽ ở Giai đoạn 10)
-        title.addListener((obs, oldVal, newVal) -> isDirty.set(true));
-        originalTitle.addListener((obs, oldVal, newVal) -> isDirty.set(true));
-        // (Rating được lưu ngay, không cần set dirty)
-        overview.addListener((obs, oldVal, newVal) -> isDirty.set(true));
-        releaseDate.addListener((obs, oldVal, newVal) -> isDirty.set(true));
-        tagItems.addListener((ListChangeListener<Tag>) c -> isDirty.set(true));
-        studioItems.addListener((ListChangeListener<Tag>) c -> isDirty.set(true));
-        peopleItems.addListener((ListChangeListener<Tag>) c -> isDirty.set(true));
-        genreItems.addListener((ListChangeListener<Tag>) c -> isDirty.set(true));
-    }
 
     @Override
     public void loadItem(BaseItemDto item) {
@@ -119,7 +132,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         final String newItemId = item.getId();
         Platform.runLater(() -> {
             clearAllDetailsUI();
-            statusMessage.set("Đang tải chi tiết cho: " + item.getName());
+            statusMessage.set(configService.getString("itemDetailViewModel", "statusLoading", item.getName()));
             showStatusMessage.set(true);
             loading.set(true);
         });
@@ -143,12 +156,13 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                     criticRating.set(loadedDto.getCriticRating()); // (UR-32)
                     overview.set(loadedDto.getOverview() != null ? loadedDto.getOverview() : "");
                     releaseDate.set(dateToString(loadedDto.getPremiereDate()));
-                    itemPath.set(loadedDto.getPath() != null ? loadedDto.getPath() : "Không có đường dẫn");
+                    itemPath.set(loadedDto.getPath() != null ? loadedDto.getPath() : configService.getString("itemDetailLoader", "noPath"));
                     isFolder.set(Boolean.TRUE.equals(loadedDto.isIsFolder()));
 
                     // (UR-34: Chuyển đổi DTOs sang Model 'Tag')
                     tagItems.setAll(parseNameLongIdPair(loadedDto.getTagItems()));
                     studioItems.setAll(parseNameLongIdPair(loadedDto.getStudios()));
+                    // (Sửa lỗi: JSON export dùng Genres, không phải GenreItems)
                     genreItems.setAll(parseStringList(loadedDto.getGenres()));
                     peopleItems.setAll(parseBaseItemPerson(loadedDto.getPeople()));
 
@@ -158,12 +172,13 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
                     loading.set(false);
                     showStatusMessage.set(false);
-                    isDirty.set(false); // Reset trạng thái dirty
+                    // (MỚI) Bắt đầu theo dõi
+                    dirtyTracker.startTracking();
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     clearAllDetailsUI();
-                    statusMessage.set("Lỗi khi tải chi tiết: " + e.getMessage());
+                    statusMessage.set(configService.getString("itemDetailViewModel", "errorLoad", e.getMessage()));
                     showStatusMessage.set(true);
                     loading.set(false);
                 });
@@ -172,6 +187,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     }
 
     private void clearAllDetailsUI() {
+        dirtyTracker.stopTracking(); // (MỚI)
         originalItemDto = null;
         currentItemId = null;
         title.set("");
@@ -187,9 +203,9 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         studioItems.clear();
         peopleItems.clear();
         genreItems.clear();
-        isDirty.set(false);
         newPrimaryImageFile.set(null);
-        statusMessage.set("Vui lòng chọn một item...");
+        importHandler.clearState(); // (MỚI)
+        statusMessage.set(configService.getString("itemDetailViewModel", "statusDefault"));
         showStatusMessage.set(true);
     }
 
@@ -197,7 +213,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private List<Tag> parseNameLongIdPair(List<NameLongIdPair> list) {
         if (list == null) return new ArrayList<>();
         return list.stream()
-                .map(pair -> Tag.parse(pair.getName(), pair.getId().toString()))
+                .map(pair -> Tag.parse(pair.getName(), pair.getId() != null ? pair.getId().toString() : null))
                 .collect(Collectors.toList());
     }
     private List<Tag> parseBaseItemPerson(List<BaseItemPerson> list) {
@@ -213,7 +229,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                 .collect(Collectors.toList());
     }
     private Image getPrimaryImageUrl(BaseItemDto dto) {
-        if (dto.getImageTags() != null && dto.getImageTags().containsKey("Primary")) {
+        if (dto.getId() != null && dto.getImageTags() != null && dto.getImageTags().containsKey("Primary")) {
             String tag = dto.getImageTags().get("Primary");
             String serverUrl = sessionService.getApiClient().getBasePath();
             String url = String.format("%s/Items/%s/Images/Primary?tag=%s&maxWidth=%d&quality=90",
@@ -225,14 +241,10 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private String dateToString(OffsetDateTime date) {
         if (date == null) return "";
         try {
-            return dateFormat.format(new Date(date.toInstant().toEpochMilli()));
+            return dateFormat.format(Date.from(date.toInstant()));
         } catch (Exception e) { return ""; }
     }
 
-    /**
-     * (SỬA LỖI 2: Triển khai getBackdropUrl).
-     * Helper build URL cho ảnh backdrop (dùng trong Controller).
-     */
     @Override
     public String getBackdropUrl(ImageInfo info) {
         if (info == null || info.getImageType() == null || currentItemId == null) {
@@ -251,82 +263,169 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
     // --- Commands (Hành động) ---
 
+    /**
+     * (CẬP NHẬT LỚN)
+     * Lưu thay đổi (thủ công hoặc sau khi Import).
+     * (UR-31, UR-34, UR-49).
+     */
     @Override
     public void saveChangesCommand() {
-        // (UR-31, UR-34, UR-49)
-        if (originalItemDto == null || currentItemId == null) return;
+        final BaseItemDto dtoAtSaveTime = this.originalItemDto;
+        final String idAtSaveTime = this.currentItemId;
 
-        notificationService.showStatus("Đang lưu thay đổi...");
-        loading.set(true);
-
-        // Tạo DTO mới dựa trên DTO gốc
-        BaseItemDto dtoToSave = new BaseItemDto();
-
-        // (Logic này sẽ được cải tiến ở Giai đoạn 10 để xử lý Import/Export)
-        dtoToSave.setName(title.get());
-        dtoToSave.setOriginalTitle(originalTitle.get());
-        dtoToSave.setOverview(overview.get());
-
-        // (UR-33: Critic Rating được lưu riêng, nhưng chúng ta vẫn gửi nó)
-        dtoToSave.setCriticRating(criticRating.get());
-
-        try {
-            Date parsedDate = dateFormat.parse(releaseDate.get());
-            Instant instant = Instant.ofEpochMilli(parsedDate.getTime());
-            dtoToSave.setPremiereDate(OffsetDateTime.ofInstant(instant, ZoneId.systemDefault()));
-        } catch (ParseException e) {
-            dtoToSave.setPremiereDate(originalItemDto.getPremiereDate()); // Giữ ngày cũ nếu parse lỗi
+        if (dtoAtSaveTime == null || idAtSaveTime == null) {
+            notificationService.showStatus(configService.getString("itemDetailViewModel", "errorSave"));
+            return;
         }
 
-        // Chuyển đổi Model 'Tag' ngược lại DTO
-        dtoToSave.setTagItems(tagItems.stream().map(tag -> new NameLongIdPair().name(tag.serialize())).collect(Collectors.toList()));
-        dtoToSave.setStudios(studioItems.stream().map(tag -> new NameLongIdPair().name(tag.serialize())).collect(Collectors.toList()));
-        dtoToSave.setGenres(genreItems.stream().map(Tag::getDisplayName).collect(Collectors.toList()));
-        dtoToSave.setPeople(peopleItems.stream().map(tag -> new BaseItemPerson().name(tag.serialize()).type(PersonType.ACTOR)).collect(Collectors.toList()));
+        notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSaving"));
+        loading.set(true);
+        importHandler.hideAllReviewButtons(); // Ẩn các nút (✓/✗)
+
+        // (MỚI) Kiểm tra xem đây là lưu thủ công hay lưu sau import
+        final boolean isSavingAfterImport = importHandler.wasImportInProgress();
+        final Set<String> acceptedFields = isSavingAfterImport ? importHandler.getAcceptedFields() : null;
+        final BaseItemDto importedDto = isSavingAfterImport ? importHandler.getImportedDto() : null;
+
+        // (MỚI) Sao chép các giá trị UI hiện tại ra biến final
+        // (để đảm bảo an toàn luồng)
+        final String finalTitle = this.title.get();
+        final String finalOriginalTitle = this.originalTitle.get();
+        final Float finalCriticRating = this.criticRating.get();
+        final String finalOverview = this.overview.get();
+        final String finalReleaseDate = this.releaseDate.get();
+        final List<Tag> finalTagItems = List.copyOf(this.tagItems);
+        final List<Tag> finalStudiosItems = List.copyOf(this.studioItems);
+        final List<Tag> finalPeopleItems = List.copyOf(this.peopleItems);
+        final List<Tag> finalGenresItems = List.copyOf(this.genreItems);
 
         new Thread(() -> {
             try {
-                itemUpdateService.updateItem(currentItemId, dtoToSave);
+                BaseItemDto dtoToSendToApi;
+
+                if (isSavingAfterImport) {
+                    // --- Logic (UR-49): Lưu sau khi Import ---
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSavingImport"));
+                    dtoToSendToApi = createDtoWithAcceptedChanges(
+                            dtoAtSaveTime, importedDto, acceptedFields
+                    );
+                } else {
+                    // --- Logic (UR-31): Lưu thủ công ---
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSavingManual"));
+                    // Clone DTO gốc để bắt đầu
+                    dtoToSendToApi = gson.fromJson(gson.toJson(dtoAtSaveTime), BaseItemDto.class);
+                    // Áp dụng các thay đổi từ UI
+                    dtoToSendToApi.setName(finalTitle);
+                    dtoToSendToApi.setOriginalTitle(finalOriginalTitle);
+                    dtoToSendToApi.setOverview(finalOverview);
+                    dtoToSendToApi.setCriticRating(finalCriticRating);
+                    dtoToSendToApi.setPremiereDate(parseDateString(finalReleaseDate, dtoAtSaveTime.getPremiereDate()));
+                    dtoToSendToApi.setTagItems(convertTagsToNameLongIdPair(finalTagItems));
+                    dtoToSendToApi.setStudios(convertTagsToNameLongIdPair(finalStudiosItems));
+                    dtoToSendToApi.setPeople(convertTagsToPeopleList(finalPeopleItems));
+                    // (Sửa lỗi: JSON export/import dùng 'Genres' (List<String>))
+                    dtoToSendToApi.setGenres(finalGenresItems.stream().map(Tag::getDisplayName).collect(Collectors.toList()));
+                    // (Xóa GenreItems (List<NameLongIdPair>) để tránh xung đột)
+                    dtoToSendToApi.setGenreItems(new ArrayList<>());
+                }
+
+                // Gửi API
+                itemUpdateService.updateItem(idAtSaveTime, dtoToSendToApi);
+
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Đã lưu thành công!");
-                    isDirty.set(false);
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSaveSuccess"));
                     loading.set(false);
-                    // Tải lại item để cập nhật originalItemDto
-                    loadItem(originalItemDto);
+                    // Tải lại item để cập nhật snapshot
+                    loadItem(dtoToSendToApi);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Lỗi khi lưu: " + e.getMessage());
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "errorApiSave", e.getClass().getSimpleName(), e.getMessage()));
                     loading.set(false);
                 });
             }
         }).start();
     }
 
+    /**
+     * (MỚI) Helper cho logic (UR-49).
+     * Tạo DTO chỉ với các trường đã được chấp nhận (✓).
+     */
+    private BaseItemDto createDtoWithAcceptedChanges(BaseItemDto originalDto, BaseItemDto importedDto, Set<String> acceptedFields) {
+        // Bắt đầu bằng cách clone DTO *gốc*
+        BaseItemDto dtoCopy = gson.fromJson(gson.toJson(originalDto), BaseItemDto.class);
+
+        // Chỉ áp dụng các trường đã được chấp nhận (✓)
+        if (acceptedFields.contains("title")) { dtoCopy.setName(importedDto.getName()); }
+        if (acceptedFields.contains("originalTitle")) { dtoCopy.setOriginalTitle(importedDto.getOriginalTitle()); }
+        if (acceptedFields.contains("criticRating")) { dtoCopy.setCriticRating(importedDto.getCriticRating()); }
+        if (acceptedFields.contains("overview")) { dtoCopy.setOverview(importedDto.getOverview()); }
+        if (acceptedFields.contains("releaseDate")) { dtoCopy.setPremiereDate(importedDto.getPremiereDate()); }
+        if (acceptedFields.contains("tags")) { dtoCopy.setTagItems(importedDto.getTagItems()); }
+        if (acceptedFields.contains("studios")) { dtoCopy.setStudios(importedDto.getStudios()); }
+        if (acceptedFields.contains("people")) { dtoCopy.setPeople(importedDto.getPeople()); }
+        if (acceptedFields.contains("genres")) {
+            dtoCopy.setGenres(importedDto.getGenres());
+            dtoCopy.setGenreItems(new ArrayList<>()); // Xóa GenreItems (nếu có)
+        }
+
+        return dtoCopy;
+    }
+
+    /**
+     * (MỚI) Helper chuyển đổi String (UI) -> OffsetDateTime (DTO)
+     */
+    private OffsetDateTime parseDateString(String dateStr, OffsetDateTime fallback) {
+        try {
+            Date parsedDate = dateFormat.parse(dateStr);
+            Instant instant = Instant.ofEpochMilli(parsedDate.getTime());
+            return OffsetDateTime.ofInstant(instant, ZoneId.systemDefault());
+        } catch (ParseException e) {
+            return fallback; // Giữ ngày cũ nếu parse lỗi
+        }
+    }
+
+    /**
+     * (MỚI) Helper chuyển đổi List<Tag> -> List<NameLongIdPair>
+     */
+    private List<NameLongIdPair> convertTagsToNameLongIdPair(List<Tag> tags) {
+        return tags.stream()
+                .map(tag -> new NameLongIdPair().name(tag.serialize()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * (MỚI) Helper chuyển đổi List<Tag> -> List<BaseItemPerson>
+     */
+    private List<BaseItemPerson> convertTagsToPeopleList(List<Tag> tags) {
+        return tags.stream()
+                .map(tag -> new BaseItemPerson().name(tag.serialize()).type(PersonType.ACTOR))
+                .collect(Collectors.toList());
+    }
+
+
     @Override
     public void saveCriticRatingImmediately(Float newRating) {
         // (UR-33)
         if (originalItemDto == null || currentItemId == null) return;
-
-        // Tạo DTO *chỉ* chứa rating
         BaseItemDto ratingDto = new BaseItemDto();
         ratingDto.setCriticRating(newRating);
-
-        notificationService.showStatus("Đang lưu điểm số...");
+        notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSavingRating"));
 
         new Thread(() -> {
             try {
                 itemUpdateService.updateItem(currentItemId, ratingDto);
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Đã lưu điểm số!");
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusSaveRatingSuccess"));
                     if (originalItemDto != null) {
-                        originalItemDto.setCriticRating(newRating); // Cập nhật DTO gốc
+                        originalItemDto.setCriticRating(newRating);
                     }
+                    // (MỚI) Cập nhật baseline của Tracker
+                    dirtyTracker.updateOriginalRating(newRating);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Lỗi lưu điểm: " + e.getMessage());
-                    // Rollback UI
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "errorSaveRating", e.getMessage()));
                     criticRating.set(originalItemDto.getCriticRating());
                 });
             }
@@ -338,151 +437,186 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         // (UR-38)
         String code = originalTitle.get();
         if (code == null || code.trim().isEmpty()) {
-            notificationService.showStatus("Tiêu đề gốc rỗng, không thể tìm ngày.");
+            notificationService.showStatus(configService.getString("itemDetailView", "originalTitlePrompt"));
             return;
         }
 
-        notificationService.showStatus("Đang tìm ngày phát hành cho: " + code);
+        notificationService.showStatus(configService.getString("itemDetailView", "statusFetchingDate", code));
         loading.set(true);
 
         new Thread(() -> {
             try {
                 ReleaseInfo info = externalDataService.fetchReleaseInfoByCode(code);
-
                 if (info == null) {
-                    throw new Exception("Không tìm thấy thông tin.");
+                    throw new Exception(configService.getString("itemDetailView", "statusFetchDateNotFound"));
                 }
 
-                // (UR-38: Logic phức tạp - Lấy Tag từ Diễn viên)
+                List<Tag> tagsFromPerson = new ArrayList<>();
+                Tag personTag = null;
+
                 if (info.getActressName() != null && !info.getActressName().isEmpty()) {
-                    // 1. Tìm diễn viên
                     List<SuggestionItem> people = staticDataRepository.getPeopleSuggestions();
                     SuggestionItem person = people.stream()
                             .filter(p -> info.getActressName().equalsIgnoreCase(p.getName()))
                             .findFirst().orElse(null);
 
                     if (person != null) {
-                        // 2. Lấy chi tiết diễn viên
                         BaseItemDto personDto = itemRepository.getFullItemDetails(person.getId());
                         if (personDto != null && personDto.getTagItems() != null) {
-                            List<Tag> tagsFromPerson = parseNameLongIdPair(personDto.getTagItems());
-
-                            Platform.runLater(() -> {
-                                // 3. Merge Tags
-                                Set<Tag> existingTags = new HashSet<>(tagItems);
-                                tagItems.addAll(tagsFromPerson.stream()
-                                        .filter(t -> !existingTags.contains(t))
-                                        .collect(Collectors.toList()));
-
-                                // 4. Add Diễn viên
-                                Tag personTag = Tag.parse(person.getName(), person.getId());
-                                if (!peopleItems.contains(personTag)) {
-                                    peopleItems.add(personTag);
-                                }
-                            });
+                            tagsFromPerson.addAll(parseNameLongIdPair(personDto.getTagItems()));
                         }
+                        personTag = Tag.parse(person.getName(), person.getId());
                     }
                 }
 
-                // Cập nhật ngày phát hành
+                final Tag finalPersonTag = personTag;
                 Platform.runLater(() -> {
                     if (info.getReleaseDate() != null) {
                         releaseDate.set(dateToString(info.getReleaseDate()));
                     }
-                    notificationService.showStatus("Lấy ngày P.H thành công!");
+                    if (!tagsFromPerson.isEmpty()) {
+                        Set<Tag> existingTags = new HashSet<>(tagItems);
+                        tagItems.addAll(tagsFromPerson.stream()
+                                .filter(t -> !existingTags.contains(t))
+                                .collect(Collectors.toList()));
+                    }
+                    if (finalPersonTag != null && !peopleItems.contains(finalPersonTag)) {
+                        peopleItems.add(finalPersonTag);
+                    }
+                    notificationService.showStatus(configService.getString("itemDetailView", "statusFetchDateSuccess"));
                     loading.set(false);
                 });
 
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Lỗi khi lấy ngày: " + e.getMessage());
+                    notificationService.showStatus(configService.getString("itemDetailView", "errorFetchDate", e.getMessage()));
                     loading.set(false);
                 });
             }
         }).start();
     }
 
+    /**
+     * (MỚI: Hoàn thiện UR-37)
+     * Nhân bản thuộc tính.
+     */
     @Override
     public void clonePropertiesCommand(String propertyType) {
-        // (UR-37)
-        // (Cần truy cập Cột 1, MainController sẽ phải tiêm ILibraryTreeViewModel vào đây)
-        // (Tạm thời bỏ qua, logic này cần sự phối hợp của MainController)
-        notificationService.showStatus("Chức năng Clone (Giai đoạn 10) cần được hoàn thiện.");
+        TreeItem<LibraryTreeItem> selectedFolder = libraryTreeViewModel.selectedTreeItemProperty().get();
+        if (selectedFolder == null || selectedFolder.getValue() == null || selectedFolder.getValue().isLoadingNode()) {
+            notificationService.showStatus(configService.getString("itemDetailView", "cloneErrorNoParent"));
+            return;
+        }
+        if (currentItemId == null) {
+            notificationService.showStatus(configService.getString("itemDetailView", "cloneErrorNoSource"));
+            return;
+        }
+
+        final String targetParentId = selectedFolder.getValue().getItemDto().getId();
+        final String sourceItemId = this.currentItemId;
+
+        notificationService.showStatus(configService.getString("itemDetailView", "cloneStatusStart", propertyType));
+        loading.set(true);
+
+        new Thread(() -> {
+            try {
+                int count = 0;
+                switch (propertyType) {
+                    case "Tags":
+                        count = itemUpdateService.cloneTags(sourceItemId, targetParentId);
+                        break;
+                    case "Studios":
+                        count = itemUpdateService.cloneStudios(sourceItemId, targetParentId);
+                        break;
+                    case "Genres":
+                        count = itemUpdateService.cloneGenres(sourceItemId, targetParentId);
+                        break;
+                    case "People":
+                        count = itemUpdateService.clonePeople(sourceItemId, targetParentId);
+                        break;
+                }
+                final int finalCount = count;
+                Platform.runLater(() -> {
+                    notificationService.showStatus(configService.getString("itemDetailView", "cloneStatusSuccess", propertyType, finalCount));
+                    loading.set(false);
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    notificationService.showStatus(configService.getString("itemDetailView", "cloneStatusError", e.getMessage()));
+                    loading.set(false);
+                });
+            }
+        }).start();
     }
 
+    // --- Commands Tương tác Local (Không đổi) ---
     @Override
     public void openFileOrFolderCommand() {
-        // (UR-39)
         String path = itemPath.get();
         try {
             localInteractionService.openFileOrFolder(path);
         } catch (Exception e) {
-            notificationService.showStatus("Lỗi mở file/thư mục: " + e.getMessage());
+            notificationService.showStatus(configService.getString("itemDetailView", "errorOpenPath", e.getMessage()));
         }
     }
 
     @Override
     public void openSubtitleCommand() {
-        // (UR-40)
         String path = itemPath.get();
         String title = titleProperty().get();
         try {
             File srtFile = localInteractionService.openSubtitleFile(path, title);
-            // Mở thư mục chứa (UR-40)
             localInteractionService.openContainingFolder(srtFile.getAbsolutePath());
-            notificationService.showStatus("Đã mở file Subtitle.");
+            notificationService.showStatus(configService.getString("itemDetailView", "statusSubtitleCreated", srtFile.getName()));
         } catch (Exception e) {
-            notificationService.showStatus("Lỗi mở Subtitle: " + e.getMessage());
+            notificationService.showStatus(configService.getString("itemDetailView", "errorSubtitleOpen", e.getMessage()));
         }
     }
 
     @Override
     public void openScreenshotFolderCommand() {
-        // (UR-43)
         String path = itemPath.get();
         try {
             String mediaFileName = new File(path).getName();
             localInteractionService.openScreenshotFolder(mediaFileName);
         } catch (Exception e) {
-            notificationService.showStatus("Lỗi mở thư mục Screenshot: " + e.getMessage());
+            notificationService.showStatus(configService.getString("itemDetailView", "errorScreenshotPathOpen", e.getMessage()));
         }
     }
 
+    // --- Commands Ảnh (Không đổi) ---
     @Override
     public void setDroppedPrimaryImage(File imageFile) {
-        // (UR-42)
         if (imageFile == null || currentItemId == null) return;
         newPrimaryImageFile.set(imageFile);
         try {
             Image localImage = new Image(imageFile.toURI().toString());
             primaryImage.set(localImage);
         } catch (Exception e) {
-            notificationService.showStatus("Lỗi preview ảnh local.");
+            notificationService.showStatus(configService.getString("itemDetailViewModel", "errorImagePreview"));
         }
     }
 
     @Override
     public void saveNewPrimaryImageCommand() {
-        // (UR-42)
         File fileToSave = newPrimaryImageFile.get();
         if (fileToSave == null || currentItemId == null) return;
 
-        notificationService.showStatus("Đang upload ảnh Primary...");
+        notificationService.showStatus(configService.getString("itemDetailViewModel", "statusUploadingPrimary"));
         loading.set(true);
 
         new Thread(() -> {
             try {
                 itemUpdateService.uploadImage(currentItemId, ImageType.PRIMARY, fileToSave);
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Upload ảnh Primary thành công!");
-                    newPrimaryImageFile.set(null); // Reset
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusUploadPrimarySuccess"));
+                    newPrimaryImageFile.set(null);
                     loading.set(false);
-                    // Tải lại item để lấy tag ảnh mới
                     loadItem(originalItemDto);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Lỗi upload: " + e.getMessage());
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "errorUploadPrimary", e.getMessage()));
                     loading.set(false);
                 });
             }
@@ -491,65 +625,128 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
     @Override
     public void deleteBackdropCommand(ImageInfo backdrop) {
-        // (UR-41)
         if (backdrop == null || currentItemId == null) return;
-        notificationService.showStatus("Đang xóa backdrop...");
+        notificationService.showStatus(configService.getString("itemDetailViewModel", "statusDeletingBackdrop", backdrop.getImageIndex()));
         new Thread(() -> {
             try {
                 itemUpdateService.deleteImage(currentItemId, backdrop.getImageType(), backdrop.getImageIndex());
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Xóa backdrop thành công.");
-                    backdropImages.remove(backdrop); // Xóa khỏi UI
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusDeleteBackdropSuccess"));
+                    backdropImages.remove(backdrop);
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> notificationService.showStatus("Lỗi xóa backdrop: " + e.getMessage()));
+                Platform.runLater(() -> notificationService.showStatus(configService.getString("itemDetailViewModel", "errorDeleteBackdrop", e.getMessage())));
             }
         }).start();
     }
 
     @Override
     public void uploadDroppedBackdropFiles(List<File> files) {
-        // (UR-41)
         if (files == null || files.isEmpty() || currentItemId == null) return;
-        notificationService.showStatus("Đang upload " + files.size() + " ảnh backdrop...");
+        notificationService.showStatus(configService.getString("itemDetailViewModel", "statusUploadingBackdrops", files.size()));
         loading.set(true);
 
         new Thread(() -> {
             try {
-                for (File file : files) {
+                for (int i = 0; i < files.size(); i++) {
+                    File file = files.get(i);
+                    final int current = i + 1;
+                    Platform.runLater(() -> notificationService.showStatus(
+                            configService.getString("itemDetailViewModel", "statusUploadingBackdropProgress", current, files.size(), file.getName())
+                    ));
                     itemUpdateService.uploadImage(currentItemId, ImageType.BACKDROP, file);
                 }
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Upload thành công " + files.size() + " backdrop.");
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "statusUploadBackdropSuccess", files.size()));
                     loading.set(false);
-                    // Tải lại (cách đơn giản nhất)
                     loadItem(originalItemDto);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    notificationService.showStatus("Lỗi upload backdrop: " + e.getMessage());
+                    notificationService.showStatus(configService.getString("itemDetailViewModel", "errorUploadBackdrop", e.getMessage()));
                     loading.set(false);
                 });
             }
         }).start();
     }
 
-    // --- (Tạm thời cho Giai đoạn 10, Giai đoạn 11 sẽ phức tạp hơn) ---
-    @Override public void addTagCommand() { tagItems.add(Tag.parse("New Tag", null)); }
-    @Override public void addStudioCommand() { studioItems.add(Tag.parse("New Studio", null)); }
-    @Override public void addGenreCommand() { genreItems.add(Tag.parse("New Genre", null)); }
-    @Override public void addPeopleCommand() { peopleItems.add(Tag.parse("New Person", null)); }
+    // --- Commands Chip (Tạm thời là placeholder, chờ GĐ 11) ---
+    @Override public void addTagCommand() { /* GĐ 11 */ }
+    @Override public void addStudioCommand() { /* GĐ 11 */ }
+    @Override public void addGenreCommand() { /* GĐ 11 */ }
+    @Override public void addPeopleCommand() { /* GĐ 11 */ }
 
+    // (Các hàm remove này được gọi bởi Controller và đã hoạt động)
     @Override public void removeTag(Tag tag) { tagItems.remove(tag); }
     @Override public void removeStudio(Tag tag) { studioItems.remove(tag); }
     @Override public void removeGenre(Tag tag) { genreItems.remove(tag); }
     @Override public void removePeople(Tag tag) { peopleItems.remove(tag); }
 
-    // --- (Tạm thời cho Giai đoạn 10) ---
-    @Override public void importAndPreview(File file) { notificationService.showStatus("Import (GĐ 10) chưa hoàn thiện."); }
-    @Override public void exportCommand(File file) { notificationService.showStatus("Export (GĐ 10) chưa hoàn thiện."); }
-    @Override public void acceptImportField(String fieldName) {}
-    @Override public void rejectImportField(String fieldName) {}
+    // --- (MỚI) Commands Import/Export (UR-44, 45, 47) ---
+    @Override
+    public void importAndPreview(File file) {
+        if (originalItemDto == null) return;
+        notificationService.showStatus(configService.getString("itemDetailView", "errorImportRead"));
+        loading.set(true);
+
+        new Thread(() -> {
+            try {
+                BaseItemDto importedDto = jsonFileHandler.readJsonFileToObject(file);
+                if (importedDto != null) {
+                    Platform.runLater(() -> {
+                        importHandler.importAndPreview(importedDto);
+                        loading.set(false);
+                        notificationService.clearStatus();
+                    });
+                } else {
+                    throw new Exception(configService.getString("itemDetailView", "errorImportInvalid"));
+                }
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    notificationService.showStatus(configService.getString("itemDetailView", "errorImportReadThread", ex.getMessage()));
+                    loading.set(false);
+                });
+            }
+        }).start();
+    }
+
+    @Override
+    public void exportCommand(File file) {
+        if (originalItemDto == null) {
+            notificationService.showStatus(configService.getString("itemDetailView", "errorExportNoData"));
+            return;
+        }
+        // Dùng DTO gốc (đã được load) để export
+        final BaseItemDto dtoToExport = this.originalItemDto;
+
+        new Thread(() -> {
+            try {
+                jsonFileHandler.writeObjectToJsonFile(dtoToExport, file);
+                Platform.runLater(() -> notificationService.showStatus(
+                        configService.getString("itemDetailView", "exportSuccess", file.getName())
+                ));
+            } catch (Exception ex) {
+                Platform.runLater(() -> notificationService.showStatus(
+                        configService.getString("itemDetailView", "errorExportWriteThread", ex.getMessage())
+                ));
+            }
+        }).start();
+    }
+
+    @Override
+    public void acceptImportField(String fieldName) {
+        importHandler.acceptImportField(fieldName);
+    }
+
+    @Override
+    public void rejectImportField(String fieldName) {
+        importHandler.rejectImportField(fieldName);
+    }
+
+    @Override
+    public void markAsDirtyByAccept() {
+        dirtyTracker.forceDirty();
+    }
 
     // --- Event (UR-36) ---
     @Override
@@ -557,10 +754,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         chipClickEvent.set(null);
     }
 
-    /**
-     * (SỬA LỖI 1: Triển khai phương thức).
-     * Helper nội bộ để kích hoạt sự kiện.
-     */
     @Override
     public void fireChipClickEvent(Tag model, String type) {
         chipClickEvent.set(new ChipClickEvent(model, type));
@@ -583,18 +776,18 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     @Override public ObservableList<Tag> getStudioItems() { return studioItems; }
     @Override public ObservableList<Tag> getPeopleItems() { return peopleItems; }
     @Override public ObservableList<Tag> getGenreItems() { return genreItems; }
-    @Override public ReadOnlyBooleanProperty isDirtyProperty() { return isDirty; }
+    @Override public ReadOnlyBooleanProperty isDirtyProperty() { return dirtyTracker.isDirtyProperty(); }
     @Override public ReadOnlyBooleanProperty primaryImageDirtyProperty() { return primaryImageDirty.getReadOnlyProperty(); }
     @Override public ReadOnlyObjectProperty<ChipClickEvent> chipClickEventProperty() { return chipClickEvent.getReadOnlyProperty(); }
 
-    // (Tạm thời trả về false cho các nút review)
-    @Override public ReadOnlyBooleanProperty showTitleReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showOverviewReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showReleaseDateReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showOriginalTitleReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showStudiosReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showPeopleReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showGenresReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showTagsReviewProperty() { return new SimpleBooleanProperty(false); }
-    @Override public ReadOnlyBooleanProperty showCriticRatingReviewProperty() { return new SimpleBooleanProperty(false); }
+    // (MỚI) Getters cho các nút review
+    @Override public ReadOnlyBooleanProperty showTitleReviewProperty() { return importHandler.showTitleReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showOverviewReviewProperty() { return importHandler.showOverviewReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showReleaseDateReviewProperty() { return importHandler.showReleaseDateReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showOriginalTitleReviewProperty() { return importHandler.showOriginalTitleReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showStudiosReviewProperty() { return importHandler.showStudiosReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showPeopleReviewProperty() { return importHandler.showPeopleReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showGenresReviewProperty() { return importHandler.showGenresReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showTagsReviewProperty() { return importHandler.showTagsReviewProperty(); }
+    @Override public ReadOnlyBooleanProperty showCriticRatingReviewProperty() { return importHandler.showCriticRatingReviewProperty(); }
 }
