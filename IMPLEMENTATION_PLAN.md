@@ -1,4 +1,18 @@
 # Kế hoạch Triển khai (Implementation Plan)
+- [x] Giai đoạn 0: Thiết lập Nền tảng (Maven & Project Setup)
+- [x] Giai đoạn 1: Lõi Trừu tượng (Interfaces & Models)
+- [ ] Giai đoạn 2: Triển khai Dịch vụ Cốt lõi & Phiên (Services & Session)
+- [ ] Giai đoạn 3: Trừu tượng hóa & Triển khai Tầng Dữ liệu (Data Layer)
+- [ ] Giai đoạn 4: Dịch vụ Tương tác & Thông báo (Core Services Pt. 2)
+- [ ] Giai đoạn 5: Dịch vụ Điều hướng & Hotkey (Core Services Pt. 3)
+- [ ] Giai đoạn 6: Màn hình Đăng nhập (View + ViewModel)
+- [ ] Giai đoạn 7: Màn hình Chính (Main View + ViewModel)
+- [ ] Giai đoạn 8: Cột Thư viện (Tree View + VM)
+- [ ] Giai đoạn 9: Cột Lưới Item (Grid View + VM)
+- [ ] Giai đoạn 10: Cột Chi tiết (Detail View + VM)
+- [ ] Giai đoạn 11: Dialog Thêm Tag (Dialog + VM)
+- [ ] Giai đoạn 12: Hoàn thiện Phím tắt & Pop-out
+- [ ] Giai đoạn 13: Hoàn thiện (Styling & I18n)
 
 Dự án sẽ được xây dựng theo từng giai đoạn ("code lan"), đi từ Nền tảng (Core) -> Dữ liệu (Data) -> Trạng thái (ViewModel) -> Giao diện (View).
 

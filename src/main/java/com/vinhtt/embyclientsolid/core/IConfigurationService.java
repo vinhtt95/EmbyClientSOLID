@@ -24,5 +24,5 @@ public interface IConfigurationService {
      * @param key Khóa (ví dụ: "screenshotBasePath").
      * @return Giá trị chuỗi, hoặc key nếu không tìm thấy.
      */
-    void StringgetString(String key);
+    String getString(String key);
 }
