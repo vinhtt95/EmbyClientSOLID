@@ -1,10 +1,18 @@
 package com.vinhtt.embyclientsolid.navigation;
 
+import com.vinhtt.embyclientsolid.MainApp;
 import com.vinhtt.embyclientsolid.core.IAppNavigator;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
+import com.vinhtt.embyclientsolid.core.IEmbySessionService;
+import com.vinhtt.embyclientsolid.controller.LoginController;
 import com.vinhtt.embyclientsolid.model.Tag;
+import com.vinhtt.embyclientsolid.viewmodel.ILoginViewModel;
+import com.vinhtt.embyclientsolid.viewmodel.impl.LoginViewModel;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -14,50 +22,85 @@ import java.net.URL;
  * Triển khai (Implementation) của IAppNavigator.
  * Chịu trách nhiệm tải FXML, cấu hình Controllers (thông qua DI) và quản lý Stages.
  *
- * LƯU Ý GIAI ĐOẠN 5:
- * Lớp này hiện tại chỉ là khung xương.
- * Ở các giai đoạn sau (6-12), nó sẽ cần được tiêm (inject)
- * các Factory hoặc Provider (ví dụ: `ILoginViewModelFactory`)
- * để có thể tiêm ViewModel vào Controller trước khi hiển thị Scene.
  */
 public class AppNavigator implements IAppNavigator {
 
     private Stage primaryStage;
     private Stage detailDialog; // Cho UR-50
 
-    // Các service khác (ví dụ: IConfigurationService, IPreferenceService,
-    // các ViewModel Factory) sẽ được tiêm (inject) vào đây ở các giai đoạn sau
-    // để cấu hình controllers.
+    // Services được tiêm (DI) từ MainApp
+    private final IEmbySessionService sessionService;
+    private final IConfigurationService configService;
+    // (Các services và factory khác sẽ được thêm vào đây khi cần)
 
     /**
-     * Khởi tạo Navigator.
-     * (Trong hệ thống DI hoàn chỉnh, các factory sẽ được tiêm ở đây).
+     * Khởi tạo Navigator với các services cốt lõi.
+     *
+     * @param sessionService Service quản lý session.
+     * @param configService  Service đọc config.
      */
-    public AppNavigator() {
-        // Ví dụ: this.loginViewModelFactory = loginViewModelFactory;
+    public AppNavigator(IEmbySessionService sessionService, IConfigurationService configService) {
+        this.sessionService = sessionService;
+        this.configService = configService;
     }
 
     @Override
     public void initialize(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        // Logic cấu hình primaryStage (ví dụ: lưu/tải kích thước từ IPreferenceService)
-        // sẽ được triển khai ở Giai đoạn 6/7.
+        // (Logic tải/lưu kích thước cửa sổ sẽ ở Giai đoạn 7)
     }
 
     @Override
     public void showLogin() {
-        // (Logic tải FXML, tiêm ViewModel, và hiển thị sẽ ở Giai đoạn 6)
-        System.out.println("AppNavigator: Điều hướng đến LoginView (Chưa triển khai FXML)");
-        // Ví dụ (sẽ lỗi ở Giai đoạn 5 vì FXML chưa tồn tại):
-        // loadScene("LoginView.fxml", "Đăng nhập Emby");
+        try {
+            // 1. Tạo ViewModel
+            ILoginViewModel viewModel = new LoginViewModel(sessionService, this, configService);
+
+            // 2. Lắng nghe tín hiệu đăng nhập thành công
+            viewModel.loginSuccessProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal) {
+                    showMain(); // Điều hướng đến màn hình chính
+                }
+            });
+
+            // 3. Tạo Controller và tiêm (inject) ViewModel
+            LoginController controller = new LoginController(viewModel, configService);
+
+            // 4. Tải FXML và tiêm Controller
+            String fxmlFile = "LoginView.fxml";
+            String title = configService.getString("mainApp", "loginTitle");
+            loadScene(fxmlFile, title, controller);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            // (Ở đây có thể gọi INotificationService để báo lỗi nghiêm trọng)
+        }
     }
 
     @Override
     public void showMain() {
         // (Logic tải FXML, tiêm ViewModels, và hiển thị sẽ ở Giai đoạn 7)
         System.out.println("AppNavigator: Điều hướng đến MainView (Chưa triển khai FXML)");
-        // Ví dụ (sẽ lỗi ở Giai đoạn 5 vì FXML chưa tồn tại):
-        // loadScene("MainView.fxml", "Emby Client");
+
+        // --- Logic Placeholder cho Giai đoạn 6 ---
+        // (Chúng ta sẽ thay thế bằng việc tải MainView.fxml ở Giai đoạn 7)
+        try {
+            Label placeholder = new Label("Đăng nhập thành công! MainView (Giai đoạn 7) sẽ ở đây.");
+            StackPane root = new StackPane(placeholder);
+            Scene scene = new Scene(root, 1280, 800);
+
+            // Tải CSS
+            URL cssUrl = MainApp.class.getResource("styles.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            }
+
+            primaryStage.setTitle(configService.getString("mainApp", "mainTitle"));
+            primaryStage.setScene(scene);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        // --- Kết thúc Placeholder ---
     }
 
     @Override
@@ -89,48 +132,34 @@ public class AppNavigator implements IAppNavigator {
     }
 
     /**
-     * (Helper nội bộ - Sẽ được dùng ở các giai đoạn sau)
-     * Tải một FXML và đặt nó làm Scene chính.
+     * Helper nội bộ để tải FXML, tiêm Controller, và hiển thị Scene.
      */
-    private void loadScene(String fxmlFile, String title) {
-        try {
-            // Logic tải FXML (giả định FXML nằm trong /view/fxml/)
-            URL fxmlUrl = getClass().getResource("/com/vinhtt/embyclientsolid/view/fxml/" + fxmlFile);
-            if (fxmlUrl == null) {
-                throw new IOException("Không tìm thấy FXML: " + fxmlFile);
-            }
-
-            FXMLLoader loader = new FXMLLoader(fxmlUrl);
-
-            // *** PHẦN QUAN TRỌNG CỦA DI ***
-            // (Ở đây, chúng ta sẽ tiêm ViewModel vào Controller)
-            // Ví dụ:
-            // if ("LoginView.fxml".equals(fxmlFile)) {
-            //    ILoginViewModel vm = loginViewModelFactory.create();
-            //    LoginController controller = new LoginController(vm, this, ...);
-            //    loader.setController(controller); // Hoặc dùng setControllerFactory
-            // }
-
-            Parent root = loader.load();
-
-            // Lấy Controller sau khi load (nếu FXML định nghĩa)
-            // Object controller = loader.getController();
-            // (Cấu hình controller nếu cần)
-
-            Scene scene = new Scene(root);
-
-            // Tải CSS (sẽ hoàn thiện ở Giai đoạn 13)
-            // URL cssUrl = getClass().getResource("/com/vinhtt/embyclientsolid/styles.css");
-            // if (cssUrl != null) {
-            //     scene.getStylesheets().add(cssUrl.toExternalForm());
-            // }
-
-            primaryStage.setTitle(title);
-            primaryStage.setScene(scene);
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            // (Nên gọi INotificationService ở đây để báo lỗi)
+    private void loadScene(String fxmlFile, String title, Object controllerInstance) throws IOException {
+        // Giả định FXML nằm trong /com/vinhtt/embyclientsolid/view/fxml/
+        URL fxmlUrl = MainApp.class.getResource("view/fxml/" + fxmlFile);
+        if (fxmlUrl == null) {
+            throw new IOException("Không tìm thấy FXML: " + fxmlFile);
         }
+
+        FXMLLoader loader = new FXMLLoader(fxmlUrl);
+
+        // Tiêm Controller (thay vì để FXML tự tạo)
+        loader.setController(controllerInstance);
+
+        Parent root = loader.load();
+
+        Scene scene = new Scene(root);
+
+        // Tải CSS
+        URL cssUrl = MainApp.class.getResource("styles.css");
+        if (cssUrl != null) {
+            scene.getStylesheets().add(cssUrl.toExternalForm());
+        } else {
+            System.err.println("Không tìm thấy file styles.css");
+        }
+
+        primaryStage.setTitle(title);
+        primaryStage.setScene(scene);
+        primaryStage.show();
     }
 }
