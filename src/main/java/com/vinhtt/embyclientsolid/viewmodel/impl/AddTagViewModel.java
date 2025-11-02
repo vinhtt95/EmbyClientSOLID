@@ -424,6 +424,7 @@ public class AddTagViewModel implements IAddTagViewModel {
     @Override
     public void selectValueSuggestion(Tag tag) {
         isUpdatingProgrammatically = true;
+        this.simpleMode.set(false);
         this.key.set(tag.getKey());
         this.value.set(tag.getValue());
         isUpdatingProgrammatically = false;
@@ -432,6 +433,7 @@ public class AddTagViewModel implements IAddTagViewModel {
     @Override
     public void selectSimpleSuggestion(SuggestionItem item) {
         isUpdatingProgrammatically = true;
+        this.simpleMode.set(true);
         this.simpleName.set(item.getName());
         isUpdatingProgrammatically = false;
     }

@@ -300,8 +300,13 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                     dtoToSendToApi.setTagItems(convertTagsToNameLongIdPair(finalTagItems));
                     dtoToSendToApi.setStudios(convertTagsToNameLongIdPair(finalStudiosItems));
                     dtoToSendToApi.setPeople(convertTagsToPeopleList(finalPeopleItems));
-                    dtoToSendToApi.setGenres(finalGenresItems.stream().map(Tag::getDisplayName).collect(Collectors.toList()));
-                    dtoToSendToApi.setGenreItems(new ArrayList<>());
+                    List<NameLongIdPair> genreItemsToSave = convertTagsToNameLongIdPair(finalGenresItems);
+
+                    // 2. Đặt vào trường 'GenreItems'
+                    dtoToSendToApi.setGenreItems(genreItemsToSave);
+
+                    // 3. Xóa rỗng trường 'Genres' (List<String>) cũ
+                    dtoToSendToApi.setGenres(new ArrayList<>());
                 }
 
                 itemUpdateService.updateItem(idAtSaveTime, dtoToSendToApi);
