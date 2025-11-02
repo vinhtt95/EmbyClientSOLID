@@ -1,12 +1,12 @@
 package com.vinhtt.embyclientsolid.controller;
 
 import com.vinhtt.embyclientsolid.MainApp;
-import com.vinhtt.embyclientsolid.core.IAppNavigator; // (MỚI)
+import com.vinhtt.embyclientsolid.core.IAppNavigator;
 import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import com.vinhtt.embyclientsolid.core.INotificationService;
 import com.vinhtt.embyclientsolid.core.IPreferenceService;
-import com.vinhtt.embyclientsolid.model.SuggestionContext; // (MỚI)
-import com.vinhtt.embyclientsolid.viewmodel.AddTagResult; // (MỚI)
+import com.vinhtt.embyclientsolid.model.SuggestionContext;
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult;
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
@@ -18,22 +18,25 @@ import javafx.beans.property.BooleanProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
-import javafx.stage.Stage; // (MỚI)
+import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.URL;
 
 /**
  * Controller cho MainView.fxml (Giai đoạn 7).
- * (Cập nhật GĐ 11: Nhận IAppNavigator, xử lý sự kiện AddTag).
+ * (Cập nhật GĐ 11/12: Sửa lỗi mất focus sau khi đóng dialog).
  */
 public class MainController {
 
@@ -60,7 +63,7 @@ public class MainController {
     private final IConfigurationService configService;
     private final IPreferenceService preferenceService;
     private final INotificationService notificationService;
-    private final IAppNavigator appNavigator; // (MỚI - GĐ 11)
+    private final IAppNavigator appNavigator;
 
     // --- Sub-Controllers ---
     private LibraryTreeController libraryTreeController;
@@ -73,7 +76,6 @@ public class MainController {
 
     /**
      * Khởi tạo MainController với tất cả các dependencies.
-     * (SỬA ĐỔI GĐ 11: Nhận IAppNavigator).
      */
     public MainController(
             MainViewModel viewModel,
@@ -83,7 +85,7 @@ public class MainController {
             IConfigurationService configService,
             IPreferenceService preferenceService,
             INotificationService notificationService,
-            IAppNavigator appNavigator // (MỚI - GĐ 11)
+            IAppNavigator appNavigator
     ) {
         this.viewModel = viewModel;
         this.libraryTreeViewModel = libraryTreeViewModel;
@@ -92,7 +94,7 @@ public class MainController {
         this.configService = configService;
         this.preferenceService = preferenceService;
         this.notificationService = notificationService;
-        this.appNavigator = appNavigator; // (MỚI - GĐ 11)
+        this.appNavigator = appNavigator;
     }
 
     @FXML
@@ -117,11 +119,13 @@ public class MainController {
             libraryTreeController.loadLibraries();
         }
 
-        // 7. Kích hoạt "Home" khi khởi động
+        // 7. (MỚI - GĐ 12/UR-13) Đăng ký Hotkeys
+        registerHotkeys();
+
+        // 8. Kích hoạt "Home" khi khởi động
         Platform.runLater(this::handleHomeButtonAction);
     }
 
-    // ... (Hàm setupLocalization không đổi) ...
     private void setupLocalization() {
         homeButton.setText(configService.getString("mainView", "homeButton"));
         logoutButton.setText(configService.getString("mainView", "logoutButton"));
@@ -129,7 +133,6 @@ public class MainController {
         searchButton.setText(configService.getString("mainView", "searchButton"));
     }
 
-    // ... (Hàm loadSubViews không đổi) ...
     private void loadSubViews() {
         try {
             libraryTreeController = loadNestedFXML("LibraryTreeView.fxml", leftPaneContainer);
@@ -153,7 +156,6 @@ public class MainController {
         }
     }
 
-    // ... (Hàm bindCommonUI không đổi) ...
     private void bindCommonUI() {
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
         BooleanBinding combinedLoading = libraryTreeViewModel.loadingProperty()
@@ -172,7 +174,7 @@ public class MainController {
     }
 
     /**
-     * (SỬA ĐỔI GĐ 11: Thêm listener cho addChipCommandProperty).
+     * (SỬA ĐỔI GĐ 11/12: Thêm logic trả focus).
      */
     private void setupViewModelCoordination() {
 
@@ -216,27 +218,28 @@ public class MainController {
             }
         });
 
-        // 6. (MỚI - GĐ 11) Chi tiết (Add Chip) -> MainController -> AppNavigator
+        // 6. Chi tiết (Add Chip) -> MainController -> AppNavigator
         itemDetailViewModel.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
             if (newCtx != null) {
-                // Lấy Stage hiện tại từ rootPane
                 Stage ownerStage = (Stage) rootPane.getScene().getWindow();
 
-                // Gọi AppNavigator để hiển thị dialog
+                // Gọi AppNavigator để hiển thị dialog (blocking)
                 AddTagResult result = appNavigator.showAddTagDialog(ownerStage, newCtx);
 
-                // Gửi kết quả (hoặc null) trở lại ViewModel
-                if (result != null) {
-                    itemDetailViewModel.processAddTagResult(result, newCtx);
-                }
+                // --- SỬA LỖI FOCUS (UR-13) ---
+                // Sau khi dialog (showAndWait) đóng, trả focus về rootPane
+                // để phím Enter có thể hoạt động ngay lập tức.
+                Platform.runLater(() -> rootPane.requestFocus());
+                // --- KẾT THÚC SỬA LỖI ---
 
-                // Báo cho ViewModel là sự kiện đã được xử lý
+                // Gửi kết quả (hoặc null) trở lại ViewModel
+                itemDetailViewModel.processAddTagResult(result, newCtx);
+
                 itemDetailViewModel.clearAddChipCommand();
             }
         });
     }
 
-    // ... (Hàm handleHomeButtonAction không đổi) ...
     @FXML
     private void handleHomeButtonAction() {
         if (libraryTreeController != null) {
@@ -246,7 +249,6 @@ public class MainController {
         itemGridViewModel.loadItemsByParentId(null); // Tải gốc
     }
 
-    // ... (Hàm loadNestedFXML không đổi) ...
     private <T> T loadNestedFXML(String fxmlFile, AnchorPane container) throws IOException {
         URL fxmlUrl = MainApp.class.getResource("view/fxml/" + fxmlFile);
         if (fxmlUrl == null) {
@@ -262,7 +264,6 @@ public class MainController {
         return loader.getController();
     }
 
-    // ... (Hàm bindSortingButtons không đổi) ...
     private void bindSortingButtons() {
         sortByButton.textProperty().bind(
                 Bindings.createStringBinding(() -> {
@@ -303,7 +304,45 @@ public class MainController {
         sortOrderButton.disableProperty().bind(isSearching);
     }
 
-    // ... (Hàm save/loadDividerPositions không đổi) ...
+    /**
+     * (MỚI - GĐ 12/UR-13) Đăng ký phím tắt cho Scene.
+     */
+    private void registerHotkeys() {
+        // Chúng ta phải đợi Stage hiển thị để lấy Scene
+        Platform.runLater(() -> {
+            Scene scene = rootPane.getScene();
+            if (scene == null) {
+                System.err.println("Không thể lấy Scene để đăng ký hotkey!");
+                return;
+            }
+
+            scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+                // (UR-13) ENTER Hotkey to repeat last Add Tag
+                if (event.getCode() == KeyCode.ENTER && !event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown()) {
+
+                    Node focusedNode = scene.getFocusOwner();
+
+                    // Kiểm tra xem focus có đang ở trên một control "chặn" (như text field, button) không
+                    boolean isBlockingControl = focusedNode instanceof javafx.scene.control.TextInputControl ||
+                            focusedNode instanceof javafx.scene.control.Button ||
+                            focusedNode instanceof javafx.scene.control.ToggleButton;
+
+                    // Chỉ kích hoạt nếu focus không nằm trên các control đó
+                    if (focusedNode == null || !isBlockingControl) {
+                        if (itemDetailViewModel != null) {
+                            // (Logic từ ItemDetailController cũ: handleRepeatAddTagDialog)
+                            itemDetailViewModel.repeatAddChipCommand();
+                            event.consume();
+                        }
+                    }
+                }
+
+                // (Các hotkey khác của GĐ 12 như Cmd+S, Cmd+N sẽ được thêm ở đây)
+
+            });
+        });
+    }
+
     private void saveDividerPositions() {
         if (mainSplitPane != null && preferenceService != null && mainSplitPane.getDividers().size() >= 2) {
             double[] positions = mainSplitPane.getDividerPositions();

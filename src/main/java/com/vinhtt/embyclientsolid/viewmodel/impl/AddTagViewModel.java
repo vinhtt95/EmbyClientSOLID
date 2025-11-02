@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 
 /**
  * Triển khai (Implementation) của IAddTagViewModel.
- * (Cập nhật: Sửa lỗi biên dịch SuggestionItem constructor).
+ * (Cập nhật: Sửa lỗi .clear() VÀ port logic auto-complete (focus lost)).
  */
 public class AddTagViewModel implements IAddTagViewModel {
 
@@ -61,14 +61,12 @@ public class AddTagViewModel implements IAddTagViewModel {
     private final StringProperty value = new SimpleStringProperty("");
     private final StringProperty copyId = new SimpleStringProperty("");
     private final ReadOnlyStringWrapper copyStatus = new ReadOnlyStringWrapper("");
+    private final ReadOnlyBooleanWrapper closeDialog = new ReadOnlyBooleanWrapper(false);
 
     // --- Properties Điều hướng Phím (Binding) ---
     private final ReadOnlyIntegerWrapper focusedKeyIndex = new ReadOnlyIntegerWrapper(-1);
     private final ReadOnlyIntegerWrapper focusedValueIndex = new ReadOnlyIntegerWrapper(-1);
     private final ReadOnlyIntegerWrapper focusedSimpleIndex = new ReadOnlyIntegerWrapper(-1);
-
-    // --- (MỚI) Property Báo đóng Dialog ---
-    private final ReadOnlyBooleanWrapper closeDialog = new ReadOnlyBooleanWrapper(false);
 
     // --- ObservableLists (Binding) ---
     private final ObservableList<String> suggestionKeys = FXCollections.observableArrayList();
@@ -81,11 +79,7 @@ public class AddTagViewModel implements IAddTagViewModel {
         setupListeners();
     }
 
-    /**
-     * Cài đặt các listener nội bộ (giống logic trong initialize() của controller cũ).
-     */
     private void setupListeners() {
-        // Chuyển đổi giữa JSON và Simple mode
         simpleMode.addListener((obs, oldVal, newVal) -> {
             if (isUpdatingProgrammatically) return;
             focusedKeyIndex.set(-1);
@@ -93,12 +87,11 @@ public class AddTagViewModel implements IAddTagViewModel {
             focusedSimpleIndex.set(-1);
         });
 
-        // Lọc danh sách gợi ý khi gõ
         keyProperty().addListener((obs, oldVal, newVal) -> {
             if (isUpdatingProgrammatically) return;
             focusedKeyIndex.set(-1);
             populateKeys(newVal);
-            populateSimpleTags(newVal); // Quick search simple
+            populateSimpleTags(newVal); // Quick search
         });
 
         valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -126,11 +119,8 @@ public class AddTagViewModel implements IAddTagViewModel {
         return result;
     }
 
-    /**
-     * Cập nhật các nhãn (label) I18n dựa trên context.
-     */
     private void updateLabels(SuggestionContext context) {
-        // (Sử dụng IConfigurationService sẽ tốt hơn, nhưng tạm thời hardcode)
+        // (Tạm thời hardcode, GĐ 13 sẽ dùng IConfigurationService)
         switch (context) {
             case STUDIO:
                 title.set("Thêm Studio Mới");
@@ -156,13 +146,9 @@ public class AddTagViewModel implements IAddTagViewModel {
         }
     }
 
-    /**
-     * Tải dữ liệu gợi ý từ Repository (chạy nền).
-     */
     private void loadSuggestedTags() {
         new Thread(() -> {
             try {
-                // 1. Tải dữ liệu thô
                 List<Tag> allRawTags = new ArrayList<>();
                 List<SuggestionItem> simpleSuggestions = new ArrayList<>();
 
@@ -181,28 +167,21 @@ public class AddTagViewModel implements IAddTagViewModel {
                         break;
                 }
 
-                // 2. Xử lý dữ liệu thô
                 Map<String, List<Tag>> tempJsonGroups = allRawTags.stream()
                         .filter(Tag::isJson)
                         .collect(Collectors.groupingBy(Tag::getKey));
 
-                // (SỬA LỖI BIÊN DỊCH TẠI ĐÂY)
                 if (currentContext == SuggestionContext.TAG) {
                     List<SuggestionItem> simpleTagsFromJson = allRawTags.stream()
                             .filter(t -> !t.isJson())
-                            // (SỬA LỖI: Gọi constructor mới của SuggestionItem)
                             .map(t -> new SuggestionItem(t.getDisplayName(), t.getId(), "Tag"))
                             .collect(Collectors.toList());
                     simpleSuggestions.addAll(simpleTagsFromJson);
                 }
 
-
-                // 3. Cập nhật UI (trên luồng JavaFX)
                 Platform.runLater(() -> {
                     this.jsonGroups = tempJsonGroups;
                     this.allSimpleSuggestions = simpleSuggestions;
-
-                    // 4. Populate lần đầu
                     isUpdatingProgrammatically = true;
                     populateKeys(key.get());
                     populateSimpleTags(simpleName.get());
@@ -210,7 +189,6 @@ public class AddTagViewModel implements IAddTagViewModel {
                 });
 
             } catch (Exception e) {
-                System.err.println("Lỗi khi tải gợi ý: " + e.getMessage());
                 e.printStackTrace();
             }
         }).start();
@@ -230,6 +208,7 @@ public class AddTagViewModel implements IAddTagViewModel {
         }
         Collections.sort(filteredKeys, String.CASE_INSENSITIVE_ORDER);
         suggestionKeys.setAll(filteredKeys);
+        // Tự động cập nhật value suggestions dựa trên key hiện tại (ngay cả khi chưa chọn)
         populateValues(key.get(), value.get());
     }
 
@@ -261,19 +240,189 @@ public class AddTagViewModel implements IAddTagViewModel {
                     .filter(item -> item.getName().toLowerCase().contains(lowerCaseSearchText))
                     .collect(Collectors.toList());
         }
-        // (SỬA LỖI: Đảm bảo danh sách không bị trùng lặp)
         suggestionSimple.setAll(filtered.stream().distinct().collect(Collectors.toList()));
     }
 
     // --- Logic Điều hướng Phím (UR-35) ---
 
     @Override
-    public void handleFieldKeyEvent(KeyEvent event) {
-        // (Sẽ được triển khai đầy đủ ở Giai đoạn 12)
-        if (event.getCode() == KeyCode.ENTER) {
-            okCommand();
+    public void handleFieldKeyEvent(KeyEvent event, String sourceField) {
+        KeyCode code = event.getCode();
+
+        if (code == KeyCode.UP || code == KeyCode.DOWN) {
+            event.consume();
+            handleArrowKeys(code, sourceField);
+        } else if (code == KeyCode.TAB && !event.isShiftDown()) {
+            event.consume();
+            handleTabKey(sourceField);
+        } else if (code == KeyCode.ENTER) {
+            event.consume();
+            handleEnterKey(sourceField);
         }
     }
+
+    /**
+     * (MỚI - SỬA LỖI) Xử lý logic auto-complete khi mất focus (blur).
+     */
+    @Override
+    public void handleFocusLost(String sourceField) {
+        if (isUpdatingProgrammatically) return;
+
+        // Đây là logic auto-complete mà bạn đã chỉ ra
+        if ("key".equals(sourceField) && focusedKeyIndex.get() == -1) {
+            String currentKeyText = key.get().trim();
+            if (!currentKeyText.isEmpty()) {
+                String correctCaseKey = null;
+                int matchIndex = -1;
+                // Tìm trong danh sách gợi ý *hiện tại*
+                for (int i = 0; i < suggestionKeys.size(); i++) {
+                    String toggleKey = suggestionKeys.get(i);
+                    if (toggleKey.equalsIgnoreCase(currentKeyText)) {
+                        correctCaseKey = toggleKey;
+                        matchIndex = i;
+                        break;
+                    }
+                }
+
+                if (correctCaseKey != null) {
+                    isUpdatingProgrammatically = true;
+                    key.set(correctCaseKey); // Auto-complete
+                    isUpdatingProgrammatically = false;
+
+                    populateValues(correctCaseKey, ""); // Populate values
+                    focusedKeyIndex.set(matchIndex); // Set focus index
+                }
+            }
+        }
+    }
+
+
+    private void handleArrowKeys(KeyCode code, String sourceField) {
+        if (simpleMode.get()) {
+            int nextIndex = navigateChipList(focusedSimpleIndex.get(), suggestionSimple.size(), code);
+            focusedSimpleIndex.set(nextIndex);
+            if (nextIndex != -1) {
+                SuggestionItem item = suggestionSimple.get(nextIndex);
+                isUpdatingProgrammatically = true;
+                simpleName.set(item.getName());
+                isUpdatingProgrammatically = false;
+            }
+        } else {
+            if ("key".equals(sourceField)) {
+                int nextIndex = navigateChipList(focusedKeyIndex.get(), suggestionKeys.size(), code);
+                focusedKeyIndex.set(nextIndex);
+                if (nextIndex != -1) {
+                    String keyText = suggestionKeys.get(nextIndex);
+                    isUpdatingProgrammatically = true;
+                    key.set(keyText);
+                    isUpdatingProgrammatically = false;
+                    populateValues(keyText, "");
+                    focusedValueIndex.set(-1);
+                }
+            } else if ("value".equals(sourceField)) {
+                int nextIndex = navigateChipList(focusedValueIndex.get(), suggestionValues.size(), code);
+                focusedValueIndex.set(nextIndex);
+                if (nextIndex != -1) {
+                    Tag tag = suggestionValues.get(nextIndex);
+                    isUpdatingProgrammatically = true;
+                    value.set(tag.getValue());
+                    isUpdatingProgrammatically = false;
+                }
+            }
+        }
+    }
+
+    private int navigateChipList(int currentIndex, int listSize, KeyCode code) {
+        if (listSize == 0) return -1;
+        int nextIndex = currentIndex;
+        if (code == KeyCode.DOWN) {
+            nextIndex++;
+            if (nextIndex >= listSize) nextIndex = 0; // Vòng
+        } else { // KeyCode.UP
+            nextIndex--;
+            if (nextIndex < 0) nextIndex = listSize - 1; // Vòng
+        }
+        return nextIndex;
+    }
+
+    private void handleTabKey(String sourceField) {
+        if ("key".equals(sourceField)) {
+            // Auto-chọn key nếu đang focus chip
+            if (focusedKeyIndex.get() != -1) {
+                selectKeySuggestion(suggestionKeys.get(focusedKeyIndex.get()));
+            } else {
+                // (LOGIC MỚI) Nếu không focus chip, chạy logic auto-complete y như focus lost
+                handleFocusLost("key");
+            }
+            // (Controller sẽ chuyển focus qua valueField)
+        } else if ("value".equals(sourceField)) {
+            // Auto-chọn value nếu đang focus chip
+            if (focusedValueIndex.get() != -1) {
+                selectValueSuggestion(suggestionValues.get(focusedValueIndex.get()));
+            }
+            // (Controller sẽ chuyển focus qua okButton)
+        } else if ("simple".equals(sourceField)) {
+            // Chuyển từ Simple -> JSON
+            String currentSimpleText = simpleName.get();
+            isUpdatingProgrammatically = true;
+            simpleMode.set(false); // Chuyển radio
+            key.set(currentSimpleText);
+
+            // --- SỬA LỖI 1 ---
+            simpleName.set(""); // Dùng .set("")
+            value.set("");      // Dùng .set("")
+            // --- KẾT THÚC SỬA LỖI 1 ---
+
+            isUpdatingProgrammatically = false;
+
+            populateKeys(currentSimpleText);
+            populateSimpleTags(currentSimpleText);
+            // (Controller sẽ chuyển focus qua keyField)
+        }
+    }
+
+    private void handleEnterKey(String sourceField) {
+        if (simpleMode.get()) {
+            if (focusedSimpleIndex.get() != -1) {
+                selectSimpleSuggestion(suggestionSimple.get(focusedSimpleIndex.get()));
+            }
+            okCommand();
+        } else {
+            if ("key".equals(sourceField)) {
+                if (value.get().trim().isEmpty()) {
+                    String keyText = key.get().trim();
+                    if (focusedKeyIndex.get() != -1) {
+                        keyText = suggestionKeys.get(focusedKeyIndex.get());
+                    }
+                    if (!keyText.isEmpty()) {
+                        isUpdatingProgrammatically = true;
+                        simpleMode.set(true);
+                        simpleName.set(keyText);
+
+                        // --- SỬA LỖI 2 ---
+                        key.set("");   // Dùng .set("")
+                        value.set(""); // Dùng .set("")
+                        // --- KẾT THÚC SỬA LỖI 2 ---
+
+                        isUpdatingProgrammatically = false;
+
+                        populateSimpleTags(keyText);
+                        // (Controller sẽ chuyển focus)
+                    } else {
+                        cancelCommand();
+                    }
+                } else {
+                    okCommand();
+                }
+            } else if ("value".equals(sourceField)) {
+                if (focusedValueIndex.get() != -1) {
+                    selectValueSuggestion(suggestionValues.get(focusedValueIndex.get()));
+                }
+                okCommand();
+            }
+        }
+    }
+
 
     @Override
     public void selectKeySuggestion(String key) {
@@ -281,6 +430,7 @@ public class AddTagViewModel implements IAddTagViewModel {
         this.key.set(key);
         isUpdatingProgrammatically = false;
         populateValues(key, "");
+        focusedValueIndex.set(-1);
     }
 
     @Override
@@ -338,7 +488,7 @@ public class AddTagViewModel implements IAddTagViewModel {
             copyStatus.set("Đang kiểm tra ID...");
             new Thread(() -> {
                 try {
-                    // (Tạm thời không lấy full DTO, chỉ cần ID)
+                    // (Tạm thời bỏ qua kiểm tra, chỉ cần ID)
                     Platform.runLater(() -> {
                         copyStatus.set("Đã chấp nhận ID.");
                         this.result = new AddTagResult(id.trim());

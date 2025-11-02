@@ -1,11 +1,12 @@
 package com.vinhtt.embyclientsolid.controller;
 
-import com.vinhtt.embyclientsolid.model.SuggestionContext;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import com.vinhtt.embyclientsolid.model.SuggestionItem;
 import com.vinhtt.embyclientsolid.model.Tag;
 import com.vinhtt.embyclientsolid.viewmodel.IAddTagViewModel;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyIntegerProperty;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -14,6 +15,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.FlowPane;
@@ -25,7 +27,7 @@ import java.util.Objects;
 
 /**
  * Controller cho AddTagDialog.fxml (View).
- * (Cập nhật: Sửa lỗi binding, lắng nghe closeDialogProperty).
+ * (Cập nhật: Thêm listener cho focus lost).
  */
 public class AddTagDialogController {
 
@@ -59,6 +61,7 @@ public class AddTagDialogController {
 
     private IAddTagViewModel viewModel;
     private Stage dialogStage;
+    private IConfigurationService configService;
 
     private static final String FOCUSED_CHIP_STYLE_CLASS = "focused-chip";
 
@@ -74,11 +77,12 @@ public class AddTagDialogController {
     }
 
     /**
-     * Được gọi bởi AppNavigator để tiêm ViewModel và Stage.
+     * Được gọi bởi AppNavigator để tiêm ViewModel, Stage và ConfigService.
      */
-    public void setViewModel(IAddTagViewModel viewModel, Stage dialogStage) {
+    public void setViewModel(IAddTagViewModel viewModel, Stage dialogStage, IConfigurationService configService) {
         this.viewModel = viewModel;
         this.dialogStage = dialogStage;
+        this.configService = configService;
         bindViewModel();
     }
 
@@ -86,21 +90,25 @@ public class AddTagDialogController {
      * Kết nối tất cả UI components với ViewModel.
      */
     private void bindViewModel() {
-        // --- Binding I18n Labels ---
+        // --- Binding I18n Labels (Lấy từ VM) ---
         titleLabel.textProperty().bind(viewModel.titleProperty());
         contentLabel.textProperty().bind(viewModel.simpleLabelProperty());
         suggestionSimpleLabel.textProperty().bind(viewModel.simpleSuggestionLabelProperty());
 
-        // (Hardcode các label khác, GĐ 13 sẽ sửa)
-        keyLabel.setText("Key:");
-        valueLabel.setText("Value:");
-        suggestionKeyLabel.setText("Key");
-        suggestionValueLabel.setText("Value");
-        jsonTagRadio.setText("Tag Key-Value (JSON)");
-        copyIdLabel.setText("Sao chép nhanh từ ID:");
-        copyButton.setText("Sao chép");
-        cancelButton.setText("Hủy");
-        okButton.setText("Đồng ý");
+        // (Lấy I18n từ ConfigService)
+        keyLabel.setText(configService.getString("addTagDialog", "keyLabel"));
+        valueLabel.setText(configService.getString("addTagDialog", "valueLabel"));
+        suggestionKeyLabel.setText(configService.getString("addTagDialog", "suggestionKeyLabel"));
+        suggestionValueLabel.setText(configService.getString("addTagDialog", "suggestionValueLabel"));
+        jsonTagRadio.setText(configService.getString("addTagDialog", "labelJson"));
+        copyIdLabel.setText(configService.getString("addTagDialog", "quickCopyLabel"));
+        copyButton.setText(configService.getString("addTagDialog", "copyButton"));
+        cancelButton.setText(configService.getString("addTagDialog", "cancelButton"));
+        okButton.setText(configService.getString("addTagDialog", "okButton"));
+        simpleNameField.setPromptText(configService.getString("addTagDialog", "contentPrompt"));
+        keyField.setPromptText(configService.getString("addTagDialog", "keyPrompt"));
+        valueField.setPromptText(configService.getString("addTagDialog", "valuePrompt"));
+        copyIdField.setPromptText(configService.getString("addTagDialog", "copyIdPrompt"));
 
         // --- Binding Radio Buttons (2 chiều) ---
         simpleTagRadio.selectedProperty().bindBidirectional(viewModel.simpleModeProperty());
@@ -119,13 +127,11 @@ public class AddTagDialogController {
         copyStatusLabel.textProperty().bind(viewModel.copyStatusProperty());
 
         // --- Binding FlowPanes Gợi ý ---
-        viewModel.getSuggestionKeys().addListener((javafx.collections.ListChangeListener.Change<? extends String> c) ->
+        viewModel.getSuggestionKeys().addListener((ListChangeListener<String>) c ->
                 populateKeySuggestions(suggestionKeysPane, viewModel.getSuggestionKeys()));
-
-        viewModel.getSuggestionValues().addListener((javafx.collections.ListChangeListener.Change<? extends Tag> c) ->
+        viewModel.getSuggestionValues().addListener((ListChangeListener<Tag>) c ->
                 populateValueSuggestions(suggestionValuesPane, viewModel.getSuggestionValues()));
-
-        viewModel.getSuggestionSimple().addListener((javafx.collections.ListChangeListener.Change<? extends SuggestionItem> c) ->
+        viewModel.getSuggestionSimple().addListener((ListChangeListener<SuggestionItem>) c ->
                 populateSimpleSuggestions(suggestionSimplePane, viewModel.getSuggestionSimple()));
 
         // --- Binding Focus (Điều hướng phím) ---
@@ -134,9 +140,29 @@ public class AddTagDialogController {
         bindChipFocus(suggestionSimplePane, viewModel.focusedSimpleIndexProperty());
 
         // --- Chuyển tiếp (Delegate) Sự kiện Phím ---
-        simpleNameField.addEventFilter(KeyEvent.KEY_PRESSED, e -> viewModel.handleFieldKeyEvent(e));
-        keyField.addEventFilter(KeyEvent.KEY_PRESSED, e -> viewModel.handleFieldKeyEvent(e));
-        valueField.addEventFilter(KeyEvent.KEY_PRESSED, e -> viewModel.handleFieldKeyEvent(e));
+        simpleNameField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            viewModel.handleFieldKeyEvent(e, "simple");
+            if (e.getCode() == KeyCode.TAB && !e.isShiftDown()) {
+                keyField.requestFocus();
+                keyField.positionCaret(keyField.getText().length());
+            }
+        });
+        keyField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            viewModel.handleFieldKeyEvent(e, "key");
+            if (e.getCode() == KeyCode.TAB && !e.isShiftDown()) {
+                valueField.requestFocus();
+            }
+            if (e.getCode() == KeyCode.ENTER && viewModel.simpleModeProperty().get()) {
+                simpleNameField.requestFocus();
+                simpleNameField.selectAll();
+            }
+        });
+        valueField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            viewModel.handleFieldKeyEvent(e, "value");
+            if (e.getCode() == KeyCode.TAB && !e.isShiftDown()) {
+                okButton.requestFocus();
+            }
+        });
         rootPane.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             if (e.getCode() == KeyCode.ESCAPE) {
                 viewModel.cancelCommand();
@@ -144,8 +170,26 @@ public class AddTagDialogController {
             }
         });
 
+        // --- (MỚI) Chuyển tiếp (Delegate) Sự kiện Mất Focus ---
+        keyField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (wasFocused && !isFocused) { // Focus Lost
+                viewModel.handleFocusLost("key");
+            }
+        });
+        valueField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (wasFocused && !isFocused) { // Focus Lost
+                viewModel.handleFocusLost("value");
+            }
+        });
+        simpleNameField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (wasFocused && !isFocused) { // Focus Lost
+                viewModel.handleFocusLost("simple");
+            }
+        });
+
         // --- Chuyển tiếp (Delegate) Sự kiện Nút ---
         copyButton.setOnAction(e -> viewModel.copyCommand());
+        // (okButton và cancelButton được gán qua FXML onAction)
 
         // --- Lắng nghe Kết quả từ VM ---
         viewModel.closeDialogProperty().addListener((obs, oldVal, newVal) -> {
@@ -172,7 +216,10 @@ public class AddTagDialogController {
             ToggleButton chip = new ToggleButton(key);
             chip.getStyleClass().add("suggestion-key-button");
             chip.setUserData(key);
-            chip.setOnAction(e -> viewModel.selectKeySuggestion(key));
+            chip.setOnAction(e -> {
+                viewModel.selectKeySuggestion(key);
+                valueField.requestFocus();
+            });
             pane.getChildren().add(chip);
         }
     }
@@ -183,7 +230,10 @@ public class AddTagDialogController {
             ToggleButton chip = new ToggleButton(tag.getValue());
             chip.getStyleClass().addAll("suggested-tag-button", "tag-view-json");
             chip.setUserData(tag);
-            chip.setOnAction(e -> viewModel.selectValueSuggestion(tag));
+            chip.setOnAction(e -> {
+                viewModel.selectValueSuggestion(tag);
+                okButton.requestFocus();
+            });
             pane.getChildren().add(chip);
         }
     }
@@ -193,13 +243,14 @@ public class AddTagDialogController {
         for (SuggestionItem item : items) {
             ToggleButton chip = new ToggleButton(item.getName());
             chip.getStyleClass().add("suggested-tag-button");
-            if (Objects.equals(item.getType(), "Genre")) {
+            if (Objects.equals(item.getType(), "Genre") || Objects.equals(item.getType(), "Tag")) {
                 chip.getStyleClass().add("tag-view-simple");
-            } else if (Objects.equals(item.getType(), "Tag")) {
-                chip.getStyleClass().add("tag-view-simple"); // Thêm style cho tag đơn giản
             }
             chip.setUserData(item);
-            chip.setOnAction(e -> viewModel.selectSimpleSuggestion(item));
+            chip.setOnAction(e -> {
+                viewModel.selectSimpleSuggestion(item);
+                okButton.requestFocus();
+            });
             pane.getChildren().add(chip);
         }
     }

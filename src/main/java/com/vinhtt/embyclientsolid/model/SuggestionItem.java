@@ -32,7 +32,7 @@ public class SuggestionItem {
     }
 
     /**
-     * (MỚI) Khởi tạo từ các giá trị thô.
+     * (MỚI - SỬA LỖI) Khởi tạo từ các giá trị thô.
      * Dùng để tạo SuggestionItem từ một đối tượng Tag (không phải BaseItemDto).
      *
      * @param name Tên hiển thị.
@@ -76,12 +76,15 @@ public class SuggestionItem {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         SuggestionItem that = (SuggestionItem) o;
-        return Objects.equals(id, that.id) &&
-                Objects.equals(name, that.name);
+        // So sánh dựa trên Name và Type (ID có thể null cho các tag/genre đơn giản)
+        // và ID (nếu có)
+        return Objects.equals(name, that.name) &&
+                Objects.equals(type, that.type) &&
+                Objects.equals(id, that.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name);
+        return Objects.hash(name, type, id);
     }
 }

@@ -4,7 +4,7 @@ import com.vinhtt.embyclientsolid.model.SuggestionContext;
 import com.vinhtt.embyclientsolid.model.SuggestionItem;
 import com.vinhtt.embyclientsolid.model.Tag;
 import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty; // (MỚI)
+import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.StringProperty;
@@ -13,8 +13,7 @@ import javafx.scene.input.KeyEvent;
 
 /**
  * Interface cho AddTagViewModel (Dialog).
- * (UR-35).
- * (Cập nhật: Thêm closeDialogProperty)
+ * (Cập nhật: Hoàn thiện logic điều hướng phím và focus lost).
  */
 public interface IAddTagViewModel {
 
@@ -39,14 +38,12 @@ public interface IAddTagViewModel {
     StringProperty valueProperty();
     StringProperty copyIdProperty();
     ReadOnlyStringProperty copyStatusProperty();
+    ReadOnlyBooleanProperty closeDialogProperty();
+
+    // --- Properties Điều hướng Phím ---
     ReadOnlyIntegerProperty focusedKeyIndexProperty();
     ReadOnlyIntegerProperty focusedValueIndexProperty();
     ReadOnlyIntegerProperty focusedSimpleIndexProperty();
-
-    /**
-     * (MỚI) Property báo hiệu cho View (Controller) rằng dialog nên được đóng.
-     */
-    ReadOnlyBooleanProperty closeDialogProperty();
 
     // --- Suggestions (Binding) ---
     ObservableList<String> getSuggestionKeys();
@@ -58,8 +55,15 @@ public interface IAddTagViewModel {
     /**
      * Xử lý tất cả các sự kiện phím (Up, Down, Enter, Tab) từ các trường text.
      * @param event Sự kiện phím.
+     * @param sourceField Tên của trường nguồn ("key", "value", "simple").
      */
-    void handleFieldKeyEvent(KeyEvent event);
+    void handleFieldKeyEvent(KeyEvent event, String sourceField);
+
+    /**
+     * (MỚI) Xử lý khi một trường text mất focus (blur).
+     * @param sourceField Tên của trường nguồn ("key", "value", "simple").
+     */
+    void handleFocusLost(String sourceField);
 
     /**
      * Xử lý click vào một Key suggestion.

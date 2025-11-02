@@ -6,11 +6,11 @@ import com.vinhtt.embyclientsolid.core.*;
 import com.vinhtt.embyclientsolid.data.*;
 import com.vinhtt.embyclientsolid.model.LibraryTreeItem;
 import com.vinhtt.embyclientsolid.model.ReleaseInfo;
-import com.vinhtt.embyclientsolid.model.SuggestionContext; // (MỚI)
+import com.vinhtt.embyclientsolid.model.SuggestionContext;
 import com.vinhtt.embyclientsolid.model.SuggestionItem;
 import com.vinhtt.embyclientsolid.model.Tag;
 import com.vinhtt.embyclientsolid.services.JsonFileHandler;
-import com.vinhtt.embyclientsolid.viewmodel.AddTagResult; // (MỚI)
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult;
 import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
 import embyclient.JSON;
@@ -40,7 +40,7 @@ import java.io.File;
 
 /**
  * Triển khai (Implementation) của IItemDetailViewModel (Cột 3).
- * (Cập nhật GĐ 11: Xử lý AddTagDialog).
+ * (Cập nhật: Thêm logic lưu lastAddContext cho hotkey UR-13).
  */
 public class ItemDetailViewModel implements IItemDetailViewModel {
 
@@ -54,8 +54,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private final IEmbySessionService sessionService;
     private final ILibraryTreeViewModel libraryTreeViewModel;
     private final IConfigurationService configService;
-    // (Lưu ý: IAppNavigator được inject vào MainController,
-    // VM này sẽ bắn sự kiện để MainController gọi Navigator)
 
     // --- Helpers ---
     private final ItemDetailDirtyTracker dirtyTracker;
@@ -67,6 +65,11 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     private BaseItemDto originalItemDto;
     private String currentItemId;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+    /**
+     * (MỚI - GĐ 12/UR-13) Lưu context cuối cùng được sử dụng.
+     */
+    private SuggestionContext lastAddContext = SuggestionContext.TAG;
+
 
     // --- Properties (Trạng thái UI) ---
     private final ReadOnlyBooleanWrapper loading = new ReadOnlyBooleanWrapper(false);
@@ -93,9 +96,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
     // --- Properties Sự kiện (Event) ---
     private final ReadOnlyObjectWrapper<ChipClickEvent> chipClickEvent = new ReadOnlyObjectWrapper<>(null);
-    /**
-     * (MỚI - GĐ 11) Sự kiện yêu cầu mở dialog Add Chip.
-     */
     private final ReadOnlyObjectWrapper<SuggestionContext> addChipCommand = new ReadOnlyObjectWrapper<>(null);
 
 
@@ -181,7 +181,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    // ... (Hàm clearAllDetailsUI không đổi) ...
     private void clearAllDetailsUI() {
         dirtyTracker.stopTracking();
         originalItemDto = null;
@@ -205,7 +204,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         showStatusMessage.set(true);
     }
 
-    // ... (Các hàm parse... không đổi) ...
     private List<Tag> parseNameLongIdPair(List<NameLongIdPair> list) {
         if (list == null) return new ArrayList<>();
         return list.stream()
@@ -257,7 +255,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         return null;
     }
 
-    // ... (Hàm saveChangesCommand không đổi) ...
     @Override
     public void saveChangesCommand() {
         final BaseItemDto dtoAtSaveTime = this.originalItemDto;
@@ -326,7 +323,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    // ... (Hàm createDtoWithAcceptedChanges không đổi) ...
     private BaseItemDto createDtoWithAcceptedChanges(BaseItemDto originalDto, BaseItemDto importedDto, Set<String> acceptedFields) {
         BaseItemDto dtoCopy = gson.fromJson(gson.toJson(originalDto), BaseItemDto.class);
 
@@ -346,7 +342,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         return dtoCopy;
     }
 
-    // ... (Hàm parseDateString không đổi) ...
     private OffsetDateTime parseDateString(String dateStr, OffsetDateTime fallback) {
         try {
             Date parsedDate = dateFormat.parse(dateStr);
@@ -357,7 +352,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }
     }
 
-    // ... (Hàm convertTags... không đổi) ...
     private List<NameLongIdPair> convertTagsToNameLongIdPair(List<Tag> tags) {
         return tags.stream()
                 .map(tag -> new NameLongIdPair().name(tag.serialize()))
@@ -369,7 +363,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                 .collect(Collectors.toList());
     }
 
-    // ... (Hàm saveCriticRatingImmediately không đổi) ...
     @Override
     public void saveCriticRatingImmediately(Float newRating) {
         if (originalItemDto == null || currentItemId == null) return;
@@ -398,7 +391,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    // ... (Hàm fetchReleaseDateCommand không đổi) ...
     @Override
     public void fetchReleaseDateCommand() {
         String code = originalTitle.get();
@@ -462,7 +454,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    // ... (Hàm clonePropertiesCommand không đổi) ...
     @Override
     public void clonePropertiesCommand(String propertyType) {
         TreeItem<LibraryTreeItem> selectedFolder = libraryTreeViewModel.selectedTreeItemProperty().get();
@@ -512,7 +503,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    // ... (Các hàm open...Command không đổi) ...
     @Override
     public void openFileOrFolderCommand() {
         String path = itemPath.get();
@@ -545,7 +535,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }
     }
 
-    // ... (Các hàm xử lý Image không đổi) ...
     @Override
     public void setDroppedPrimaryImage(File imageFile) {
         if (imageFile == null || currentItemId == null) return;
@@ -628,27 +617,53 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         }).start();
     }
 
-    // --- (SỬA ĐỔI GĐ 11) ---
-    @Override public void addTagCommand() { addChipCommand.set(SuggestionContext.TAG); }
-    @Override public void addStudioCommand() { addChipCommand.set(SuggestionContext.STUDIO); }
-    @Override public void addGenreCommand() { addChipCommand.set(SuggestionContext.GENRE); }
-    @Override public void addPeopleCommand() { addChipCommand.set(SuggestionContext.PEOPLE); }
+    // --- (SỬA ĐỔI GĐ 11 / UR-13) ---
+    @Override public void addTagCommand() {
+        this.lastAddContext = SuggestionContext.TAG; // Lưu context
+        addChipCommand.set(SuggestionContext.TAG);
+    }
+    @Override public void addStudioCommand() {
+        this.lastAddContext = SuggestionContext.STUDIO; // Lưu context
+        addChipCommand.set(SuggestionContext.STUDIO);
+    }
+    @Override public void addGenreCommand() {
+        this.lastAddContext = SuggestionContext.GENRE; // Lưu context
+        addChipCommand.set(SuggestionContext.GENRE);
+    }
+    @Override public void addPeopleCommand() {
+        this.lastAddContext = SuggestionContext.PEOPLE; // Lưu context
+        addChipCommand.set(SuggestionContext.PEOPLE);
+    }
+
     @Override public ReadOnlyObjectProperty<SuggestionContext> addChipCommandProperty() { return addChipCommand.getReadOnlyProperty(); }
     @Override public void clearAddChipCommand() { addChipCommand.set(null); }
 
-    // ... (Các hàm remove... không đổi) ...
     @Override public void removeTag(Tag tag) { tagItems.remove(tag); }
     @Override public void removeStudio(Tag tag) { studioItems.remove(tag); }
     @Override public void removeGenre(Tag tag) { genreItems.remove(tag); }
     @Override public void removePeople(Tag tag) { peopleItems.remove(tag); }
 
-    // --- (MỚI - GĐ 11) ---
     /**
-     * Xử lý kết quả từ AddTagDialog.
+     * (MỚI - GĐ 12/UR-13)
+     * Kích hoạt lại dialog "Add Chip" cuối cùng đã được sử dụng.
      */
+    @Override
+    public void repeatAddChipCommand() {
+        if (currentItemId == null) {
+            notificationService.showStatus(configService.getString("itemDetailView", "errorSave")); // "Lỗi: Không có item nào đang được chọn..."
+            return;
+        }
+        // Kích hoạt sự kiện với context đã lưu
+        addChipCommand.set(this.lastAddContext);
+    }
+
+
     @Override
     public void processAddTagResult(AddTagResult result, SuggestionContext context) {
         if (result == null) return; // Người dùng hủy
+
+        // (MỚI - GĐ 12/UR-13) Lưu lại context vừa dùng thành công
+        this.lastAddContext = context;
 
         if (result.isTag()) {
             Tag newTag = result.getTag();
@@ -667,14 +682,10 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                     break;
             }
         } else if (result.isCopy()) {
-            // Kích hoạt logic "Copy From ID" (UR-35)
             copyPropertiesFromItemCommand(result.getCopyId(), context);
         }
     }
 
-    /**
-     * (MỚI - GĐ 11) Logic "Copy From ID", port từ ItemDetailController (cũ).
-     */
     private void copyPropertiesFromItemCommand(String sourceItemId, SuggestionContext context) {
         if (currentItemId == null) {
             notificationService.showStatus(configService.getString("itemDetailViewModel", "errorSave"));
@@ -734,7 +745,6 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     }
 
 
-    // ... (Các hàm Import/Export không đổi) ...
     @Override
     public void importAndPreview(File file) {
         if (originalItemDto == null) return;
@@ -782,6 +792,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             }
         }).start();
     }
+
     @Override public void acceptImportField(String fieldName) { importHandler.acceptImportField(fieldName); }
     @Override public void rejectImportField(String fieldName) { importHandler.rejectImportField(fieldName); }
     @Override public void markAsDirtyByAccept() { dirtyTracker.forceDirty(); }
@@ -796,15 +807,8 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         return name;
     }
 
-    // ... (Các hàm clearChipClickEvent/fireChipClickEvent không đổi) ...
-    @Override
-    public void clearChipClickEvent() {
-        chipClickEvent.set(null);
-    }
-    @Override
-    public void fireChipClickEvent(Tag model, String type) {
-        chipClickEvent.set(new ChipClickEvent(model, type));
-    }
+    @Override public void clearChipClickEvent() { chipClickEvent.set(null); }
+    @Override public void fireChipClickEvent(Tag model, String type) { chipClickEvent.set(new ChipClickEvent(model, type)); }
 
     // --- Getters cho Properties (Binding) ---
     @Override public ReadOnlyBooleanProperty loadingProperty() { return loading.getReadOnlyProperty(); }
