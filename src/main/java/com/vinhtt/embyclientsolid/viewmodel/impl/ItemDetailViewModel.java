@@ -148,7 +148,13 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                     this.currentItemId = newItemId;
 
                     title.set(loadedDto.getName() != null ? loadedDto.getName() : "");
-                    originalTitle.set(loadedDto.getOriginalTitle() != null ? loadedDto.getOriginalTitle() : "");
+                    String originalTitleFromDto = loadedDto.getOriginalTitle();
+                    if (originalTitleFromDto == null || originalTitleFromDto.trim().isEmpty()) {
+                        String suggestedTitle = suggestOriginalTitleFromPath(loadedDto.getPath());
+                        originalTitle.set(suggestedTitle != null ? suggestedTitle : "");
+                    } else {
+                        originalTitle.set(originalTitleFromDto);
+                    }
                     criticRating.set(loadedDto.getCriticRating());
                     overview.set(loadedDto.getOverview() != null ? loadedDto.getOverview() : "");
                     releaseDate.set(dateToString(loadedDto.getPremiereDate()));
@@ -798,6 +804,78 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
                 ));
             }
         }).start();
+    }
+
+    /**
+     * Helper tạo tên gốc gợi ý từ đường dẫn file media.
+     * Cơ chế: Lấy tên file, loại bỏ phần mở rộng, thay thế dấu chấm/gạch ngang bằng khoảng trắng, và chuyển Title Case.
+     */
+    private String suggestOriginalTitleFromPath(String path) {
+        if (path == null || path.isEmpty()) return null;
+        File file = new File(path);
+        if (file.isDirectory()) return null;
+
+        String fileName = file.getName();
+        if (fileName.isEmpty()) return null;
+
+        // 1. Loại bỏ phần mở rộng (ví dụ: .mp4, .mkv)
+        int lastDot = fileName.lastIndexOf('.');
+        String baseName = (lastDot == -1) ? fileName : fileName.substring(0, lastDot);
+
+        baseName = normalizeFileName(baseName);
+        return baseName;
+    }
+
+    public static String normalizeFileName(String input) {
+        if (input == null || input.isEmpty()) {
+            return "";
+        }
+
+        // 1. Loại bỏ các hậu tố chất lượng (HD, 4K, 1080P) với mọi ký tự phân tách phổ biến (., -, _)
+        // và các lỗi cú pháp ngoặc []
+        String cleanedInput = input
+                // Loại bỏ các mẫu [4K], [HD], v.v. (kể cả lỗi cú pháp như [4K})
+                .replaceAll("(?i)[._-]?[\\p{Punct}&&[^.-_]]*4k[\\p{Punct}&&[^.-_]]*$", "")
+                .replaceAll("(?i)[._-][\\p{Punct}&&[^.-_]]*(HD|1080P|720P)[\\p{Punct}&&[^.-_]]*$", "")
+                // Loại bỏ các hậu tố sau khi đã dọn dẹp ký tự đặc biệt xung quanh
+                .replaceAll("(?i)[._-](4k|hd|1080p|720p)$", "");
+
+        // 2. Chèn dấu '-' giữa phần chữ và số (ví dụ: ABC317 -> ABC-317)
+        String normalized = cleanedInput
+                .replaceAll("([a-zA-Z])(\\d)", "$1-$2") // Chữ theo sau là số
+                .replaceAll("(\\d)([a-zA-Z])", "$1-$2"); // Số theo sau là chữ
+
+        // 3. Thay thế MỌI ký tự không phải chữ/số/gạch ngang bằng dấu '-'
+        normalized = normalized
+                .replaceAll("[^a-zA-Z0-9-]", "-")
+                .replaceAll("-+", "-") // Loại bỏ dấu '-' thừa
+                .replaceAll("^-|-$", ""); // Loại bỏ dấu '-' ở đầu/cuối chuỗi
+
+        // 4. Tách và chuẩn hóa các phần, đồng thời loại bỏ các hậu tố còn sót lại
+        String[] parts = normalized.split("-");
+        StringBuilder result = new StringBuilder();
+        boolean firstPart = true;
+
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+
+            // BỔ SUNG: Loại bỏ các phần tử hậu tố chất lượng SÓT LẠI sau khi đã bị tách
+            // Điều này xử lý triệt để các trường hợp như ABC-741-4K
+            if (part.matches("(?i)\\d*K|HD|1080P|720P|MP4|MKV|COM|NET|ORG")) {
+                continue;
+            }
+
+            if (!firstPart) {
+                result.append("-");
+            }
+
+            // Đảm bảo phần chữ cái được in hoa
+            result.append(part.toUpperCase());
+
+            firstPart = false;
+        }
+
+        return result.toString();
     }
 
     @Override public void acceptImportField(String fieldName) { importHandler.acceptImportField(fieldName); }
