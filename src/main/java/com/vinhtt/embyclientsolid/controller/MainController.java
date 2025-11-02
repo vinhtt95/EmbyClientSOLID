@@ -15,6 +15,8 @@ import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -69,6 +71,7 @@ public class MainController {
     private LibraryTreeController libraryTreeController;
     private ItemGridController itemGridController;
     private ItemDetailController itemDetailController;
+    private boolean isChipLoading = false;
 
     // --- Constants for Divider Positions (UR-8) ---
     private static final String KEY_DIVIDER_1 = "dividerPos1";
@@ -174,7 +177,9 @@ public class MainController {
 
         // 2. Lưới -> Chi tiết
         itemGridViewModel.selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            itemDetailViewModel.loadItem(newVal);
+            if (!isChipLoading) {
+                itemDetailViewModel.loadItem(newVal);
+            }
         });
 
         // 3. MainVM (Tìm kiếm) -> Lưới
@@ -194,11 +199,32 @@ public class MainController {
         // 5. Chi tiết (Click Chip) -> Lưới
         itemDetailViewModel.chipClickEventProperty().addListener((obs, oldEvent, newEvent) -> {
             if (newEvent != null) {
+                // 1. Đặt cờ
+                isChipLoading = true;
+
+                // 2. (SỬA LỖI TIMING) Thêm một listener tạm thời vào GridVM
+                // Listener này sẽ tự hủy sau khi reset cờ.
+                itemGridViewModel.loadingProperty().addListener(new ChangeListener<Boolean>() {
+                    @Override
+                    public void changed(ObservableValue<? extends Boolean> obs, Boolean wasLoading, Boolean isLoading) {
+                        if (wasLoading && !isLoading) { // Khi GridVM tải xong (từ true -> false)
+                            isChipLoading = false; // Reset cờ
+                            itemGridViewModel.loadingProperty().removeListener(this); // Tự hủy
+                        }
+                    }
+                });
+
+                // 3. Xóa chọn cây và text tìm kiếm
                 if (libraryTreeController != null) {
                     libraryTreeController.clearSelection();
                 }
                 searchField.setText("");
+
+                // 4. Kích hoạt tải lưới (việc này sẽ set loading=true, sau đó set selectedItem=null)
+                // Listener (số 2) giờ sẽ thấy isChipLoading=true và bỏ qua việc xóa Cột 3
                 itemGridViewModel.loadItemsByChip(newEvent.model, newEvent.type);
+
+                // 5. Tiêu thụ sự kiện
                 itemDetailViewModel.clearChipClickEvent();
             }
         });

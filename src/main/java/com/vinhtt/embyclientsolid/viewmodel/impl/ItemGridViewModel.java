@@ -390,8 +390,14 @@ public class ItemGridViewModel implements IItemGridViewModel {
             showStatusMessage.set(false); // Ẩn status Cục bộ, hiện grid
         }
 
-        // Chọn item
-        selectItem(itemIdToSelect, pageItems);
+        if (currentStateType == GridNavigationState.StateType.CHIP && itemIdToSelect == null) {
+            // Khi click chip mới (không phải khôi phục state), không auto-select
+            // Điều này sẽ khiến MainController gọi itemDetailViewModel.loadItem(null)
+            selectedItem.set(null);
+        } else {
+            // Trạng thái FOLDER, SEARCH, hoặc khi khôi phục state (Back/Forward) của CHIP
+            selectItem(itemIdToSelect, pageItems);
+        }
 
         loading.set(false); // Tắt loading Cục bộ (của Cột 2)
         isRestoringState = false; // Luôn reset cờ
