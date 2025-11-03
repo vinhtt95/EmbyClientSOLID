@@ -311,6 +311,14 @@ public class AppNavigator implements IAppNavigator {
                 if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
                 detailDialog.setScene(scene);
 
+                registerHotkeysForScene(
+                        scene,
+                        null, // Không có MainController
+                        controller,     // Controller CỘT 3 của pop-out
+                        null, // Không có GridController
+                        this.mainGridVM // VM CỘT 2 (chung)
+                );
+
                 // 8. Đăng ký hotkeys cho scene MỚI này (UR-13)
                 // (Chỉ truyền vào các thành phần mà pop-out có)
                 final IItemDetailViewModel sharedVM = this.mainDetailVM;
