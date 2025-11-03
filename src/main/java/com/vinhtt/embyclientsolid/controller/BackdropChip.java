@@ -12,57 +12,55 @@ import javafx.scene.layout.StackPane;
 import java.util.function.Consumer;
 
 /**
- * Custom Control (Chip) để hiển thị một ảnh Backdrop.
- * (UR-41).
+ * Custom Control (View Component) đại diện cho một ảnh Backdrop (ảnh nền)
+ * trong gallery (UR-41).
+ * Lớp này hiển thị ảnh, indicator loading, và nút xóa.
  */
 public class BackdropChip extends StackPane {
 
     private static final double THUMBNAIL_HEIGHT = 100;
 
-    // (Lưu ý: Chúng ta đang vi phạm DIP ở đây một chút vì
-    // không thể inject IEmbySessionService vào một custom control.
-    // Cách tốt hơn là ItemDetailViewModel sẽ cung cấp URL đầy đủ.)
-
-    // (Cập nhật: Chúng ta sẽ truyền ItemID vào và tự build URL.
-    // Vẫn cần IEmbySessionService...
-    // -> Quyết định: Truyền thẳng URL vào (ViewModel sẽ build URL))
-
     /**
-     * Khởi tạo BackdropChip.
-     * @param imageInfo   Thông tin ảnh.
+     * Khởi tạo một BackdropChip (ảnh thumbnail trong gallery).
+     *
+     * @param imageInfo   Thông tin ảnh (ImageInfo) từ Emby, chứa index.
      * @param imageUrl    URL đầy đủ của ảnh (đã được ViewModel build).
-     * @param onDelete    Hàm callback khi nhấn nút Xóa.
+     * @param onDelete    Hàm callback (sự kiện) được gọi khi nhấn nút Xóa.
      */
     public BackdropChip(ImageInfo imageInfo, String imageUrl, Consumer<ImageInfo> onDelete) {
         setPrefHeight(THUMBNAIL_HEIGHT);
         getStyleClass().add("backdrop-view");
 
-        // 1. Ảnh
+        // 1. ImageView để hiển thị ảnh
         ImageView imageView = new ImageView();
         imageView.setFitHeight(THUMBNAIL_HEIGHT);
         imageView.setPreserveRatio(true);
         imageView.setSmooth(true);
 
-        // 2. Loading
+        // 2. ProgressIndicator (vòng xoay loading)
         ProgressIndicator loading = new ProgressIndicator();
         loading.setMaxSize(40, 40);
 
         // 3. Nút Xóa (UR-41)
         Button deleteButton = new Button("✕");
         deleteButton.getStyleClass().add("backdrop-delete-button");
+        // Ủy thác hành động xóa cho Consumer (callback) đã được tiêm vào
         deleteButton.setOnAction(e -> onDelete.accept(imageInfo));
         StackPane.setAlignment(deleteButton, Pos.TOP_RIGHT);
 
         getChildren().addAll(loading, imageView, deleteButton);
 
-        // 4. Tải ảnh
+        // 4. Tải ảnh (nền)
         if (imageUrl != null) {
             Image image = new Image(imageUrl, true); // true = tải nền
             imageView.setImage(image);
 
+            // Ẩn/hiện vòng xoay loading dựa trên tiến trình tải ảnh
             image.progressProperty().addListener((obs, oldVal, newVal) -> {
                 loading.setVisible(newVal.doubleValue() < 1.0);
             });
+
+            // Xử lý lỗi tải ảnh
             image.errorProperty().addListener((obs, wasError, isError) -> {
                 if(isError) {
                     System.err.println("Lỗi tải backdrop: " + imageUrl);
@@ -70,8 +68,8 @@ public class BackdropChip extends StackPane {
                 }
             });
         } else {
+            // Không có URL, ẩn loading
             loading.setVisible(false);
-            // (Có thể set ảnh placeholder)
         }
     }
 }

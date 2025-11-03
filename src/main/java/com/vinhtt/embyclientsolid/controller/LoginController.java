@@ -10,14 +10,13 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 
 /**
- * Controller cho LoginView.fxml (View).
- * Lớp này "ngu ngốc" (dumb) và tuân thủ MVVM.
- * Nó nhận ViewModel qua constructor và chỉ thực hiện binding dữ liệu.
- * Logic được chuyển từ LoginController.java cũ.
+ * Controller (View) cho LoginView.fxml.
+ * Lớp này chỉ chịu trách nhiệm binding UI components với ILoginViewModel
+ * và ủy thác (delegate) các hành động của người dùng cho ViewModel.
  */
 public class LoginController {
 
-    // @FXML fields khớp với LoginView.fxml
+    // --- FXML UI Components ---
     @FXML private Label titleLabel;
     @FXML private TextField serverUrlField;
     @FXML private TextField usernameField;
@@ -29,9 +28,9 @@ public class LoginController {
     private final IConfigurationService configService;
 
     /**
-     * Khởi tạo Controller với ViewModel và Services cần thiết (DI).
+     * Khởi tạo Controller với các dependencies cần thiết (DI).
      *
-     * @param viewModel     ViewModel cho màn hình này.
+     * @param viewModel     ViewModel chứa logic và trạng thái của màn hình Login.
      * @param configService Service để lấy chuỗi I18n.
      */
     public LoginController(ILoginViewModel viewModel, IConfigurationService configService) {
@@ -40,7 +39,8 @@ public class LoginController {
     }
 
     /**
-     * Được gọi bởi FXMLLoader sau khi tiêm (inject) các trường @FXML.
+     * Được gọi bởi FXMLLoader sau khi các trường @FXML đã được tiêm (inject).
+     * Thực hiện việc cài đặt I18n và binding dữ liệu.
      */
     @FXML
     public void initialize() {
@@ -48,13 +48,19 @@ public class LoginController {
         setupLocalization();
 
         // 2. Binding (Liên kết) UI với ViewModel
+
+        // Liên kết 2 chiều (bindBidirectional) cho các trường text
         serverUrlField.textProperty().bindBidirectional(viewModel.serverUrlProperty());
         usernameField.textProperty().bindBidirectional(viewModel.usernameProperty());
         passwordField.textProperty().bindBidirectional(viewModel.passwordProperty());
+
+        // Liên kết 1 chiều (bind) cho label trạng thái
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
 
-        // Binding trạng thái loading cho nút
+        // Liên kết trạng thái loading cho nút Login
+        // Vô hiệu hóa nút nếu đang đăng nhập
         loginButton.disableProperty().bind(viewModel.loginInProgressProperty());
+        // Thay đổi text của nút (ví dụ: "Login" -> "Logging in...")
         loginButton.textProperty().bind(
                 Bindings.when(viewModel.loginInProgressProperty())
                         .then(configService.getString("loginView", "loginInProgress"))
@@ -63,7 +69,7 @@ public class LoginController {
     }
 
     /**
-     * Cài đặt các chuỗi văn bản (I18n) từ config service.
+     * Cài đặt các chuỗi văn bản (I18n) cho UI từ config service.
      */
     private void setupLocalization() {
         titleLabel.setText(configService.getString("loginView", "title"));
@@ -73,8 +79,8 @@ public class LoginController {
     }
 
     /**
-     * Xử lý sự kiện nhấn nút Đăng nhập (từ FXML).
-     * Chỉ gọi command trên ViewModel.
+     * Xử lý sự kiện onAction của nút Đăng nhập (được gọi từ FXML).
+     * Ủy thác hành động cho ViewModel.
      */
     @FXML
     private void handleLoginButtonAction() {
@@ -82,8 +88,8 @@ public class LoginController {
     }
 
     /**
-     * Xử lý sự kiện nhấn Enter trên trường Mật khẩu (từ FXML).
-     * Chỉ gọi command trên ViewModel.
+     * Xử lý sự kiện nhấn Enter trên trường Mật khẩu (được gọi từ FXML).
+     * Ủy thác hành động cho ViewModel.
      */
     @FXML
     private void handlePasswordKeyPress() {

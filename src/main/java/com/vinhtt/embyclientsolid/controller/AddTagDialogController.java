@@ -26,8 +26,9 @@ import javafx.stage.Stage;
 import java.util.Objects;
 
 /**
- * Controller cho AddTagDialog.fxml (View).
- * (Cập nhật: Sửa lỗi NullPointer trên copyStatusLabel và lỗi 'isJson()').
+ * Controller (View) cho AddTagDialog.fxml.
+ * Lớp này chỉ chịu trách nhiệm binding UI components với ViewModel và
+ * ủy thác (delegate) các hành động của người dùng (như click, gõ phím) cho ViewModel xử lý.
  */
 public class AddTagDialogController {
 
@@ -63,21 +64,27 @@ public class AddTagDialogController {
     private Stage dialogStage;
     private IConfigurationService configService;
 
+    // Định danh CSS cho chip đang được focus (điều hướng bằng phím)
     private static final String FOCUSED_CHIP_STYLE_CLASS = "focused-chip";
 
     /**
-     * Khởi tạo Controller.
+     * Khởi tạo Controller (mặc định).
      */
     public AddTagDialogController() {
     }
 
     @FXML
     public void initialize() {
-        // Logic binding được chuyển sang setViewModel()
+        // Logic binding được chuyển sang setViewModel() để đảm bảo ViewModel đã được tiêm (inject).
     }
 
     /**
-     * Được gọi bởi AppNavigator để tiêm ViewModel, Stage và ConfigService.
+     * Tiêm (inject) ViewModel, Stage và ConfigService vào Controller.
+     * Đây là phương thức khởi tạo chính cho Controller này, được gọi bởi AppNavigator.
+     *
+     * @param viewModel   ViewModel chứa logic và trạng thái của dialog.
+     * @param dialogStage Stage (cửa sổ) của dialog này.
+     * @param configService Service để lấy chuỗi I18n.
      */
     public void setViewModel(IAddTagViewModel viewModel, Stage dialogStage, IConfigurationService configService) {
         this.viewModel = viewModel;
@@ -87,16 +94,19 @@ public class AddTagDialogController {
     }
 
     /**
-     * Kết nối tất cả UI components với ViewModel.
+     * Kết nối tất cả các UI components với các thuộc tính (Properties) trong ViewModel.
+     * Cài đặt lắng nghe sự kiện và ủy thác cho ViewModel.
      */
     private void bindViewModel() {
         // --- Binding I18n Labels (Lấy từ VM) ---
+        // Các label này thay đổi dựa trên Context (Tag, Studio, People...)
         titleLabel.textProperty().bind(viewModel.titleProperty());
         contentLabel.textProperty().bind(viewModel.simpleLabelProperty());
         suggestionSimpleLabel.textProperty().bind(viewModel.simpleSuggestionLabelProperty());
         simpleTagRadio.textProperty().bind(viewModel.simpleLabelProperty());
 
-        // (Lấy I18n từ ConfigService)
+        // --- Binding I18n Labels (Lấy từ ConfigService) ---
+        // Các label này cố định
         keyLabel.setText(configService.getString("addTagDialog", "keyLabel"));
         valueLabel.setText(configService.getString("addTagDialog", "valueLabel"));
         suggestionKeyLabel.setText(configService.getString("addTagDialog", "suggestionKeyLabel"));
@@ -112,11 +122,14 @@ public class AddTagDialogController {
         copyIdField.setPromptText(configService.getString("addTagDialog", "copyIdPrompt"));
 
         // --- Binding Radio Buttons (2 chiều) ---
+        // Liên kết nút radio "Simple" với thuộc tính simpleModeProperty của VM
         simpleTagRadio.selectedProperty().bindBidirectional(viewModel.simpleModeProperty());
 
         // --- Binding Chế độ Hiển thị (Pane) ---
+        // Hiển thị pane "Simple" nếu simpleMode là true
         simpleTagPane.visibleProperty().bind(viewModel.simpleModeProperty());
         simpleTagPane.managedProperty().bind(viewModel.simpleModeProperty());
+        // Hiển thị pane "JSON" nếu simpleMode là false
         jsonTagPane.visibleProperty().bind(viewModel.simpleModeProperty().not());
         jsonTagPane.managedProperty().bind(viewModel.simpleModeProperty().not());
 
@@ -126,10 +139,11 @@ public class AddTagDialogController {
         valueField.textProperty().bindBidirectional(viewModel.valueProperty());
         copyIdField.textProperty().bindBidirectional(viewModel.copyIdProperty());
 
-        // (SỬA LỖI 1: Dòng này giờ đã hợp lệ)
-//        copyStatusLabel.textProperty().bind(viewModel.copyStatusProperty());
+        // Liên kết label trạng thái copy
+        // copyStatusLabel.textProperty().bind(viewModel.copyStatusProperty());
 
         // --- Binding FlowPanes Gợi ý ---
+        // Tự động cập nhật UI khi danh sách gợi ý trong VM thay đổi
         viewModel.getSuggestionKeys().addListener((ListChangeListener<String>) c ->
                 populateKeySuggestions(suggestionKeysPane, viewModel.getSuggestionKeys()));
         viewModel.getSuggestionValues().addListener((ListChangeListener<Tag>) c ->
@@ -138,13 +152,16 @@ public class AddTagDialogController {
                 populateSimpleSuggestions(suggestionSimplePane, viewModel.getSuggestionSimple()));
 
         // --- Binding Focus (Điều hướng phím) ---
+        // Lắng nghe thuộc tính index focus của VM để highlight chip tương ứng
         bindChipFocus(suggestionKeysPane, viewModel.focusedKeyIndexProperty());
         bindChipFocus(suggestionValuesPane, viewModel.focusedValueIndexProperty());
         bindChipFocus(suggestionSimplePane, viewModel.focusedSimpleIndexProperty());
 
         // --- Chuyển tiếp (Delegate) Sự kiện Phím ---
+        // Gửi sự kiện gõ phím (UP, DOWN, ENTER, TAB) từ các trường text đến VM
         simpleNameField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             viewModel.handleFieldKeyEvent(e, "simple");
+            // Xử lý TAB thủ công để chuyển focus
             if (e.getCode() == KeyCode.TAB && !e.isShiftDown()) {
                 valueField.requestFocus();
             }
@@ -154,6 +171,7 @@ public class AddTagDialogController {
             if (e.getCode() == KeyCode.TAB && !e.isShiftDown()) {
                 valueField.requestFocus();
             }
+            // Nếu nhấn Enter ở chế độ Simple (đã bị ẩn), chuyển focus về simpleNameField
             if (e.getCode() == KeyCode.ENTER && viewModel.simpleModeProperty().get()) {
                 simpleNameField.requestFocus();
                 simpleNameField.selectAll();
@@ -165,6 +183,7 @@ public class AddTagDialogController {
                 okButton.requestFocus();
             }
         });
+        // Bắt phím ESCAPE để đóng dialog
         rootPane.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             if (e.getCode() == KeyCode.ESCAPE) {
                 viewModel.cancelCommand();
@@ -173,6 +192,7 @@ public class AddTagDialogController {
         });
 
         // --- Chuyển tiếp (Delegate) Sự kiện Mất Focus ---
+        // Báo cho VM biết khi người dùng click ra ngoài một trường text
         keyField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
             if (wasFocused && !isFocused) { // Focus Lost
                 viewModel.handleFocusLost("key");
@@ -194,6 +214,7 @@ public class AddTagDialogController {
         // (okButton và cancelButton được gán qua FXML onAction)
 
         // --- Lắng nghe Kết quả từ VM ---
+        // Tự động đóng dialog khi VM ra lệnh
         viewModel.closeDialogProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
                 Platform.runLater(() -> dialogStage.close());
@@ -201,6 +222,7 @@ public class AddTagDialogController {
         });
 
         // --- Focus ban đầu ---
+        // Tự động focus vào trường text thích hợp khi mở dialog
         Platform.runLater(() -> {
             if (viewModel.simpleModeProperty().get()) {
                 simpleNameField.requestFocus();
@@ -212,46 +234,63 @@ public class AddTagDialogController {
 
     // --- Helpers tạo Chip Gợi ý ---
 
+    /**
+     * Tạo các chip (ToggleButton) cho danh sách Key gợi ý (JSON).
+     *
+     * @param pane FlowPane để chứa các chip.
+     * @param keys Danh sách các Key (String).
+     */
     private void populateKeySuggestions(FlowPane pane, ObservableList<String> keys) {
         pane.getChildren().clear();
         for (String key : keys) {
             ToggleButton chip = new ToggleButton(key);
             chip.getStyleClass().add("suggestion-key-button");
             chip.setUserData(key);
+            // Khi click, báo cho VM biết key được chọn
             chip.setOnAction(e -> {
                 ensureSingleSelection(pane, chip);
                 viewModel.selectKeySuggestion(key);
-                valueField.requestFocus();
+                valueField.requestFocus(); // Chuyển focus sang trường Value
             });
             pane.getChildren().add(chip);
         }
     }
 
+    /**
+     * Tạo các chip (ToggleButton) cho danh sách Value gợi ý (JSON).
+     *
+     * @param pane FlowPane để chứa các chip.
+     * @param tags Danh sách các Tag (chứa Key-Value).
+     */
     private void populateValueSuggestions(FlowPane pane, ObservableList<Tag> tags) {
         pane.getChildren().clear();
         for (Tag tag : tags) {
             ToggleButton chip = new ToggleButton(tag.getValue());
             chip.getStyleClass().addAll("suggested-tag-button", "tag-view-json");
             chip.setUserData(tag);
+            // Khi click, báo cho VM biết Tag (Value) được chọn
             chip.setOnAction(e -> {
                 ensureSingleSelection(pane, chip);
                 viewModel.selectValueSuggestion(tag);
-                okButton.requestFocus();
+                okButton.requestFocus(); // Chuyển focus sang nút OK
             });
             pane.getChildren().add(chip);
         }
     }
 
+    /**
+     * Tạo các chip (ToggleButton) cho danh sách gợi ý Đơn giản (Simple).
+     *
+     * @param pane FlowPane để chứa các chip.
+     * @param items Danh sách các SuggestionItem.
+     */
     private void populateSimpleSuggestions(FlowPane pane, ObservableList<SuggestionItem> items) {
         pane.getChildren().clear();
         for (SuggestionItem item : items) {
             ToggleButton chip = new ToggleButton(item.getName());
             chip.getStyleClass().add("suggested-tag-button");
 
-            // (SỬA LỖI 2: Xóa 'item.isJson()' và đơn giản hóa logic)
-            // Vì đây là populateSimpleSuggestions, chúng luôn là 'simple'.
-            // Chúng ta chỉ cần áp dụng style 'tag-view-simple' (màu hồng)
-            // cho các context nhất định, giống project cũ.
+            // Áp dụng style màu hồng cho Tag và Genre
             String type = item.getType();
             if (Objects.equals(type, "GENRE") || Objects.equals(type, "TAG")) {
                 chip.getStyleClass().add("tag-view-simple");
@@ -259,29 +298,37 @@ public class AddTagDialogController {
             // (Context STUDIO và PEOPLE sẽ dùng style .suggested-tag-button mặc định)
 
             chip.setUserData(item);
+            // Khi click, báo cho VM biết item được chọn
             chip.setOnAction(e -> {
                 ensureSingleSelection(pane, chip);
                 viewModel.selectSimpleSuggestion(item);
-                okButton.requestFocus();
+                okButton.requestFocus(); // Chuyển focus sang nút OK
             });
             pane.getChildren().add(chip);
         }
     }
 
     /**
-     * Binding style focus (CSS) cho các chip.
+     * Lắng nghe VM và áp dụng/xóa style CSS 'focused-chip' cho chip
+     * dựa trên chỉ số (index) focus.
+     *
+     * @param pane FlowPane chứa các chip.
+     * @param focusIndex Thuộc tính (ReadOnlyIntegerProperty) chứa chỉ số chip đang được focus.
      */
     private void bindChipFocus(FlowPane pane, ReadOnlyIntegerProperty focusIndex) {
         focusIndex.addListener((obs, oldIndex, newIndex) -> {
             Platform.runLater(() -> {
                 int idx = newIndex.intValue();
+                // Duyệt qua tất cả các chip con
                 for (int i = 0; i < pane.getChildren().size(); i++) {
                     Node child = pane.getChildren().get(i);
                     if (i == idx) {
+                        // Thêm style nếu là chip được focus
                         if (!child.getStyleClass().contains(FOCUSED_CHIP_STYLE_CLASS)) {
                             child.getStyleClass().add(FOCUSED_CHIP_STYLE_CLASS);
                         }
                     } else {
+                        // Xóa style khỏi các chip khác
                         child.getStyleClass().remove(FOCUSED_CHIP_STYLE_CLASS);
                     }
                 }
@@ -290,10 +337,13 @@ public class AddTagDialogController {
     }
 
     /**
-     * Highlight các trường nhập liệu nếu VM báo lỗi.
+     * Đánh dấu (highlight) trường text không hợp lệ nếu người dùng nhấn OK
+     * mà VM báo lỗi (chưa có kết quả).
      */
     private void highlightInvalidField() {
         TextField fieldToHighlight = null;
+
+        // Xác định trường nào cần highlight dựa trên chế độ (mode)
         if (viewModel.simpleModeProperty().get()) {
             if (viewModel.simpleNameProperty().get().trim().isEmpty()) {
                 fieldToHighlight = simpleNameField;
@@ -306,30 +356,33 @@ public class AddTagDialogController {
             }
         }
 
+        // Áp dụng style lỗi và focus vào trường đó
         if (fieldToHighlight != null) {
             final TextField finalField = fieldToHighlight;
             Platform.runLater(() -> {
                 finalField.requestFocus();
                 finalField.getStyleClass().add("validation-error");
-                // (Giai đoạn 12 sẽ thêm PauseTransition để xóa style)
+                // (Có thể thêm PauseTransition để xóa style sau vài giây)
             });
         }
     }
 
     /**
-     * Được gọi từ FXML.
+     * Xử lý sự kiện onAction của nút OK (được gọi từ FXML).
+     * Ủy thác cho ViewModel.
      */
     @FXML
     private void handleOk() {
         viewModel.okCommand();
-        // Kiểm tra xem VM đã tạo result chưa
+        // Nếu VM báo rằng kết quả không hợp lệ (result == null), highlight trường lỗi
         if (viewModel.getResult() == null) {
             highlightInvalidField();
         }
     }
 
     /**
-     * Được gọi từ FXML.
+     * Xử lý sự kiện onAction của nút Cancel (được gọi từ FXML).
+     * Ủy thác cho ViewModel.
      */
     @FXML
     private void handleCancel() {
@@ -337,17 +390,21 @@ public class AddTagDialogController {
     }
 
     /**
-     * Helper đảm bảo chỉ có một ToggleButton trong FlowPane được chọn (setSelected(true)).
+     * Đảm bảo chỉ có một ToggleButton trong FlowPane được chọn (setSelected(true)).
+     * Ngăn người dùng bỏ chọn (deselect) chip.
+     *
+     * @param pane FlowPane chứa các chip.
+     * @param selectedButton Chip vừa được click.
      */
     private void ensureSingleSelection(FlowPane pane, ToggleButton selectedButton) {
         Platform.runLater(() -> {
+            // Bỏ chọn tất cả các nút khác
             for (Node node : pane.getChildren()) {
                 if (node instanceof ToggleButton && node != selectedButton) {
-                    // Buộc tất cả các nút khác phải bị bỏ chọn
                     ((ToggleButton) node).setSelected(false);
                 }
             }
-            // Đảm bảo nút hiện tại được chọn (phòng trường hợp người dùng click để bỏ chọn)
+            // Đảm bảo nút hiện tại luôn được chọn
             selectedButton.setSelected(true);
         });
     }

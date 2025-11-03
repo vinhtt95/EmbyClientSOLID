@@ -36,8 +36,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Controller cho ItemDetailView.fxml (Cột 3).
- * (Cập nhật GĐ 10: Binding các nút Review (✓/✗) ).
+ * Controller (View) cho ItemDetailView.fxml (Cột 3).
+ * Lớp này chỉ chịu trách nhiệm binding UI components với ItemDetailViewModel
+ * và ủy thác (delegate) các hành động của người dùng (clicks, drag-drop) cho ViewModel.
  */
 public class ItemDetailController {
 
@@ -89,7 +90,7 @@ public class ItemDetailController {
     @FXML private Button importButton;
     @FXML private Button exportButton;
 
-    // (MỚI) FXML fields cho các nút Review (✓/✗) (UR-46)
+    // --- FXML UI Components (Import/Export Review) ---
     @FXML private HBox reviewTitleContainer;
     @FXML private Button acceptTitleButton;
     @FXML private Button rejectTitleButton;
@@ -121,7 +122,8 @@ public class ItemDetailController {
 
 
     private IItemDetailViewModel viewModel;
-    private IConfigurationService configService; // Cần cho I18n
+    private IConfigurationService configService;
+    // Helper để xử lý logic hiển thị dialog Mở/Lưu file JSON
     private JsonFileHandler jsonFileHandler;
 
     /**
@@ -132,11 +134,15 @@ public class ItemDetailController {
 
     @FXML
     public void initialize() {
-        // (Chờ setViewModel)
+        // Chờ setViewModel được gọi.
     }
 
     /**
-     * Được gọi bởi MainController (View-Coordinator) để tiêm ViewModel và Services.
+     * Tiêm (inject) ViewModel và Services vào Controller.
+     * Đây là phương thức khởi tạo chính cho Controller này, được gọi bởi MainController.
+     *
+     * @param viewModel ViewModel chứa logic và trạng thái của Cột 3.
+     * @param configService Service để lấy chuỗi I18n.
      */
     public void setViewModel(IItemDetailViewModel viewModel, IConfigurationService configService) {
         this.viewModel = viewModel;
@@ -166,7 +172,7 @@ public class ItemDetailController {
     }
 
     /**
-     * Cài đặt I18n (UR-11).
+     * Cài đặt tất cả các chuỗi văn bản (I18n) từ ConfigService.
      */
     private void setupLocalization() {
         statusLabel.setText(configService.getString("itemDetailView", "statusDefault"));
@@ -199,7 +205,7 @@ public class ItemDetailController {
         importButton.setText(configService.getString("itemDetailView", "importButton"));
         exportButton.setText(configService.getString("itemDetailView", "exportButton"));
 
-        // (MỚI) I18n cho các nút Review (✓/✗)
+        // Cài đặt I18n cho các nút Review (✓/✗)
         String acceptText = configService.getString("itemDetailView", "acceptButton");
         String rejectText = configService.getString("itemDetailView", "rejectButton");
         acceptTitleButton.setText(acceptText);
@@ -223,14 +229,18 @@ public class ItemDetailController {
     }
 
     /**
-     * Binding các thuộc tính UI cơ bản.
+     * Liên kết (bind) các thuộc tính UI cơ bản (như visibility, text) với
+     * các thuộc tính (Properties) tương ứng trong ViewModel.
      */
     private void bindUIState() {
+        // Liên kết trạng thái loading
         statusLabel.textProperty().bind(viewModel.statusMessageProperty());
         loadingIndicator.visibleProperty().bind(viewModel.loadingProperty());
+        // Label trạng thái chỉ hiển thị khi đang tải hoặc khi VM yêu cầu (ví dụ: "Vui lòng chọn item")
         statusLabel.visibleProperty().bind(viewModel.loadingProperty().or(viewModel.showStatusMessageProperty()));
 
-        // Ẩn/hiện nội dung chính
+        // Ẩn/hiện toàn bộ nội dung chi tiết
+        // Nội dung chỉ hiển thị khi KHÔNG loading VÀ KHÔNG ở trạng thái chờ (ví dụ: "Vui lòng chọn item")
         mainScrollPane.visibleProperty().bind(viewModel.loadingProperty().not().and(viewModel.showStatusMessageProperty().not()));
         mainScrollPane.managedProperty().bind(mainScrollPane.visibleProperty());
         bottomButtonBar.visibleProperty().bind(mainScrollPane.visibleProperty());
@@ -240,29 +250,32 @@ public class ItemDetailController {
         backdropHeaderHBox.visibleProperty().bind(mainScrollPane.visibleProperty());
         backdropHeaderHBox.managedProperty().bind(mainScrollPane.visibleProperty());
 
-        // Binding các trường dữ liệu
+        // Liên kết 2 chiều (bindBidirectional) cho các trường text
         titleTextField.textProperty().bindBidirectional(viewModel.titleProperty());
         originalTitleTextField.textProperty().bindBidirectional(viewModel.originalTitleProperty());
         overviewTextArea.textProperty().bindBidirectional(viewModel.overviewProperty());
         releaseDateTextField.textProperty().bindBidirectional(viewModel.releaseDateProperty());
+
+        // Liên kết 1 chiều (bind) cho ảnh
         primaryImageView.imageProperty().bind(viewModel.primaryImageProperty());
 
-        // Binding hiển thị đường dẫn (UR-39)
+        // Liên kết hiển thị đường dẫn file (UR-39)
         pathTextField.textProperty().bind(viewModel.itemPathProperty());
+        // Container đường dẫn chỉ hiển thị nếu đường dẫn không rỗng và không phải là "Không có đường dẫn"
         pathContainer.visibleProperty().bind(
                 viewModel.itemPathProperty().isNotEmpty()
                         .and(viewModel.itemPathProperty().isNotEqualTo(configService.getString("itemDetailLoader", "noPath")))
         );
         pathContainer.managedProperty().bind(pathContainer.visibleProperty());
 
-        // Nút Mở (UR-39)
+        // Thay đổi text của nút Mở (UR-39)
         openButton.textProperty().bind(
                 Bindings.when(viewModel.isFolderProperty())
                         .then(configService.getString("itemDetailView", "openButtonFolder"))
                         .otherwise(configService.getString("itemDetailView", "openButtonFile"))
         );
 
-        // Nút Subtitle (UR-40)
+        // Nút Subtitle (UR-40) chỉ hiển thị khi là file (không phải folder)
         openSubtitleButton.visibleProperty().bind(
                 pathContainer.visibleProperty().and(viewModel.isFolderProperty().not())
         );
@@ -272,16 +285,19 @@ public class ItemDetailController {
         releaseDateContainer.visibleProperty().bind(viewModel.isFolderProperty().not());
         releaseDateContainer.managedProperty().bind(viewModel.isFolderProperty().not());
 
-        // Binding nút Save (UR-48)
+        // Liên kết nút Save (UR-48)
+        // Nút Save chỉ bật khi VM báo trạng thái là "dirty" (đã thay đổi)
         saveButton.disableProperty().bind(viewModel.isDirtyProperty().not());
 
-        // Binding nút Lưu Ảnh (UR-42)
+        // Liên kết nút Lưu Ảnh (UR-42)
+        // Nút Save Primary Image chỉ hiển thị khi có ảnh mới được kéo vào
         savePrimaryImageButton.visibleProperty().bind(viewModel.primaryImageDirtyProperty());
         savePrimaryImageButton.managedProperty().bind(viewModel.primaryImageDirtyProperty());
     }
 
     /**
-     * (MỚI) Binding các nút (✓/✗) cho Import/Export (UR-46).
+     * Liên kết (bind) visibility của các HBox chứa nút (✓/✗) với
+     * các thuộc tính (Properties) tương ứng trong ViewModel (UR-46).
      */
     private void bindReviewButtons() {
         bindReviewContainer(reviewTitleContainer, viewModel.showTitleReviewProperty());
@@ -296,7 +312,10 @@ public class ItemDetailController {
     }
 
     /**
-     * (MỚI) Helper để binding visibility của HBox chứa nút (✓/✗).
+     * Helper để binding visibility của HBox chứa nút (✓/✗).
+     *
+     * @param container HBox (container) chứa 2 nút Accept/Reject.
+     * @param visibilityProperty Thuộc tính boolean (ReadOnlyBooleanProperty) từ VM.
      */
     private void bindReviewContainer(HBox container, ReadOnlyBooleanProperty visibilityProperty) {
         if (container != null && visibilityProperty != null) {
@@ -307,34 +326,37 @@ public class ItemDetailController {
 
 
     /**
-     * Cài đặt binding cho các FlowPane.
+     * Cài đặt lắng nghe (listener) cho các danh sách (ObservableList) trong ViewModel
+     * để tự động cập nhật UI khi danh sách thay đổi.
      */
     private void bindFlowPanes() {
         // (UR-34: Tags)
         viewModel.getTagItems().addListener((ListChangeListener<Tag>) c -> updateFlowPane(tagsFlowPane, viewModel.getTagItems(), "TAG"));
-
         // (UR-34: Studios)
         viewModel.getStudioItems().addListener((ListChangeListener<Tag>) c -> updateFlowPane(studiosFlowPane, viewModel.getStudioItems(), "STUDIO"));
-
         // (UR-34: People)
         viewModel.getPeopleItems().addListener((ListChangeListener<Tag>) c -> updateFlowPane(peopleFlowPane, viewModel.getPeopleItems(), "PEOPLE"));
-
         // (UR-34: Genres)
         viewModel.getGenreItems().addListener((ListChangeListener<Tag>) c -> updateFlowPane(genresFlowPane, viewModel.getGenreItems(), "GENRE"));
-
         // (UR-41: Backdrops)
         viewModel.getBackdropImages().addListener((ListChangeListener<ImageInfo>) c -> updateImageGallery());
     }
 
     /**
-     * Helper cập nhật FlowPane cho Tags/Studios/People/Genres.
+     * Helper cập nhật FlowPane cho Tags/Studios/People/Genres (UR-34, UR-36).
+     * Xóa tất cả chip cũ và tạo lại chip mới từ danh sách.
+     *
+     * @param pane FlowPane (UI) cần cập nhật.
+     * @param list Danh sách (ObservableList) các đối tượng Tag.
+     * @param chipType Loại chip (để VM biết xử lý sự kiện click/delete).
      */
     private void updateFlowPane(FlowPane pane, ObservableList<Tag> list, String chipType) {
         Platform.runLater(() -> {
             pane.getChildren().clear();
             for (Tag tag : list) {
+                // Tạo một TagChip (custom control)
                 TagChip chip = new TagChip(tag,
-                        (model) -> { // OnDelete
+                        (model) -> { // Callback khi nhấn nút Xóa (OnDelete)
                             switch (chipType) {
                                 case "TAG": viewModel.removeTag(model); break;
                                 case "STUDIO": viewModel.removeStudio(model); break;
@@ -342,7 +364,7 @@ public class ItemDetailController {
                                 case "GENRE": viewModel.removeGenre(model); break;
                             }
                         },
-                        (model) -> { // OnClick (UR-36)
+                        (model) -> { // Callback khi nhấn vào chip (OnClick) (UR-36)
                             viewModel.fireChipClickEvent(model, chipType);
                         }
                 );
@@ -352,7 +374,8 @@ public class ItemDetailController {
     }
 
     /**
-     * Helper cập nhật Gallery ảnh nền (Backdrops).
+     * Helper cập nhật Gallery ảnh nền (Backdrops) (UR-41).
+     * Xóa tất cả ảnh cũ và tạo lại các BackdropChip mới.
      */
     private void updateImageGallery() {
         Platform.runLater(() -> {
@@ -360,9 +383,11 @@ public class ItemDetailController {
             if (viewModel == null) return;
 
             for (ImageInfo imageInfo : viewModel.getBackdropImages()) {
+                // Lấy URL ảnh đã build từ VM
                 String imageUrl = viewModel.getBackdropUrl(imageInfo);
+                // Tạo BackdropChip (custom control)
                 BackdropChip chip = new BackdropChip(imageInfo, imageUrl,
-                        (img) -> viewModel.deleteBackdropCommand(img) // OnDelete
+                        (img) -> viewModel.deleteBackdropCommand(img) // Callback OnDelete
                 );
                 imageGalleryPane.getChildren().add(chip);
             }
@@ -370,8 +395,7 @@ public class ItemDetailController {
     }
 
     /**
-     * Cài đặt 10 nút Rating.
-     * (UR-32, UR-33).
+     * Tạo 10 nút (Button) cho việc đánh giá (Rating) (UR-32, UR-33).
      */
     private void setupCriticRatingButtons() {
         criticRatingPane.getChildren().clear();
@@ -379,31 +403,40 @@ public class ItemDetailController {
             final int ratingValue = i;
             Button ratingButton = new Button(String.valueOf(ratingValue));
             ratingButton.getStyleClass().add("rating-button");
-            ratingButton.setUserData(ratingValue);
+            ratingButton.setUserData(ratingValue); // Lưu giá trị rating vào nút
 
+            // (UR-33) Khi click, gọi thẳng command trong VM
             ratingButton.setOnAction(e -> {
                 Float newRating = (float) ratingValue;
+                // Nếu click vào nút đã chọn, bỏ chọn (set null)
                 if (Objects.equals(viewModel.criticRatingProperty().get(), newRating)) {
                     newRating = null;
                 }
+                // Cập nhật giá trị trong VM
                 viewModel.criticRatingProperty().set(newRating);
+                // Gọi command để lưu ngay lập tức
                 viewModel.saveCriticRatingImmediately(newRating);
             });
             criticRatingPane.getChildren().add(ratingButton);
         }
 
+        // Lắng nghe thay đổi từ VM (ví dụ: khi tải item) để cập nhật UI
         viewModel.criticRatingProperty().addListener((obs, oldVal, newVal) -> updateRatingButtonSelection(newVal));
+        // Cập nhật lần đầu
         updateRatingButtonSelection(viewModel.criticRatingProperty().get());
     }
 
     /**
-     * Helper cập nhật CSS cho nút Rating.
+     * Helper cập nhật CSS "selected" cho các nút Rating (UR-32).
+     *
+     * @param currentRating Giá trị rating hiện tại (hoặc null).
      */
     private void updateRatingButtonSelection(Float currentRating) {
         Integer selectedValue = (currentRating != null) ? Math.round(currentRating) : null;
         for (Node node : criticRatingPane.getChildren()) {
             if (node instanceof Button) {
                 int buttonValue = (Integer) node.getUserData();
+                // Thêm/Xóa class "selected"
                 if (selectedValue != null && buttonValue == selectedValue) {
                     if (!node.getStyleClass().contains("selected")) {
                         node.getStyleClass().add("selected");
@@ -416,29 +449,28 @@ public class ItemDetailController {
     }
 
     /**
-     * Gán tất cả các hành động (Command) cho nút.
+     * Gán tất cả các hành động (Command) của ViewModel cho các nút (Button).
      */
     private void setupButtonActions() {
         // Commands chính
         saveButton.setOnAction(e -> viewModel.saveChangesCommand());
         fetchReleaseDateButton.setOnAction(e -> viewModel.fetchReleaseDateCommand());
 
-        // Commands Tương tác Local
+        // Commands Tương tác Local (UR-39, UR-40, UR-43)
         openButton.setOnAction(e -> viewModel.openFileOrFolderCommand());
         openSubtitleButton.setOnAction(e -> viewModel.openSubtitleCommand());
-        primaryImageContainer.setOnMouseClicked(e -> viewModel.openScreenshotFolderCommand()); // (UR-43)
+        primaryImageContainer.setOnMouseClicked(e -> viewModel.openScreenshotFolderCommand());
 
-        // Commands Ảnh
+        // Commands Ảnh (UR-41, UR-42)
         savePrimaryImageButton.setOnAction(e -> viewModel.saveNewPrimaryImageCommand());
         addBackdropButton.setOnAction(e -> {
-            // (Tạm thời dùng FileChooser, GĐ 12 sẽ thêm Drag-Drop)
             File file = showImageFileChooser(true);
             if (file != null) {
                 viewModel.uploadDroppedBackdropFiles(List.of(file));
             }
         });
 
-        // Commands Add Chip (UR-35) - (Sẽ được thay thế ở GĐ 11)
+        // Commands Add Chip (UR-35)
         addTagButton.setOnAction(e -> viewModel.addTagCommand());
         addStudioButton.setOnAction(e -> viewModel.addStudioCommand());
         addGenreButton.setOnAction(e -> viewModel.addGenreCommand());
@@ -450,7 +482,7 @@ public class ItemDetailController {
         cloneGenreButton.setOnAction(e -> viewModel.clonePropertiesCommand("Genres"));
         clonePeopleButton.setOnAction(e -> viewModel.clonePropertiesCommand("People"));
 
-        // (MỚI) Commands Import/Export (UR-44, UR-45)
+        // Commands Import/Export (UR-44, UR-45)
         importButton.setOnAction(e -> {
             File file = jsonFileHandler.showOpenJsonDialog(getStage());
             if (file != null) viewModel.importAndPreview(file);
@@ -459,14 +491,13 @@ public class ItemDetailController {
             String rawName = viewModel.getExportFileName();
             // Xử lý tên file (thay thế các ký tự không hợp lệ)
             String initialFileName = (rawName != null ? rawName.replaceAll("[^a-zA-Z0-9.-]", "_") : "item") + ".json";
-
             File file = jsonFileHandler.showSaveJsonDialog(getStage(), initialFileName);
             if (file != null) {
                 viewModel.exportCommand(file);
             }
         });
 
-        // (MỚI) Commands Accept/Reject (UR-47)
+        // Commands Accept/Reject (UR-47)
         acceptTitleButton.setOnAction(e -> viewModel.acceptImportField("title"));
         rejectTitleButton.setOnAction(e -> viewModel.rejectImportField("title"));
         acceptCriticRatingButton.setOnAction(e -> viewModel.acceptImportField("criticRating"));
@@ -488,11 +519,12 @@ public class ItemDetailController {
     }
 
     /**
-     * Cài đặt Drag-and-Drop cho ảnh.
+     * Cài đặt lắng nghe sự kiện Kéo-Thả (Drag-and-Drop) cho ảnh (UR-41, UR-42).
      */
     private void setupDragAndDrop() {
         // (UR-42: Ảnh Primary)
         primaryImageContainer.setOnDragOver(event -> {
+            // Chấp nhận sự kiện nếu có file ảnh
             if (event.getGestureSource() != primaryImageContainer && event.getDragboard().hasFiles()) {
                 if (getFirstImageFileFromDragboard(event.getDragboard()).isPresent()) {
                     event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
@@ -501,6 +533,7 @@ public class ItemDetailController {
             event.consume();
         });
         primaryImageContainer.setOnDragDropped(event -> {
+            // Khi thả file, lấy file ảnh đầu tiên và báo cho VM
             getFirstImageFileFromDragboard(event.getDragboard()).ifPresent(file -> {
                 viewModel.setDroppedPrimaryImage(file);
                 event.setDropCompleted(true);
@@ -509,9 +542,11 @@ public class ItemDetailController {
         });
 
         // (UR-41: Ảnh Backdrop)
+        // Áp dụng cho cả FlowPane và ScrollPane (để có thể thả vào vùng trống)
         Node[] dropTargets = {imageGalleryPane, imageGalleryScrollPane};
         for (Node target : dropTargets) {
             target.setOnDragOver(event -> {
+                // Chấp nhận sự kiện nếu có file ảnh
                 if (event.getGestureSource() != target && event.getDragboard().hasFiles()) {
                     if (!getImageFilesFromDragboard(event.getDragboard()).isEmpty()) {
                         event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
@@ -520,6 +555,7 @@ public class ItemDetailController {
                 event.consume();
             });
             target.setOnDragDropped(event -> {
+                // Khi thả file, lấy TẤT CẢ file ảnh và báo cho VM
                 List<File> files = getImageFilesFromDragboard(event.getDragboard());
                 if (!files.isEmpty()) {
                     viewModel.uploadDroppedBackdropFiles(files);
@@ -531,16 +567,28 @@ public class ItemDetailController {
     }
 
     // --- Helpers (Drag-and-Drop) ---
+
+    /**
+     * Kiểm tra xem file có phải là định dạng ảnh hỗ trợ không.
+     */
     private boolean isImageFile(File file) {
         String name = file.getName().toLowerCase();
         return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp");
     }
+
+    /**
+     * Lấy danh sách các file ảnh hợp lệ từ Dragboard.
+     */
     private List<File> getImageFilesFromDragboard(Dragboard db) {
         if (db.hasFiles()) {
             return db.getFiles().stream().filter(this::isImageFile).collect(Collectors.toList());
         }
         return List.of();
     }
+
+    /**
+     * Lấy file ảnh hợp lệ ĐẦU TIÊN từ Dragboard (dùng cho Primary Image).
+     */
     private Optional<File> getFirstImageFileFromDragboard(Dragboard db) {
         if (db.hasFiles()) {
             return db.getFiles().stream().filter(this::isImageFile).findFirst();
@@ -549,6 +597,13 @@ public class ItemDetailController {
     }
 
     // --- Helpers (File Chooser) ---
+
+    /**
+     * Hiển thị FileChooser (cửa sổ chọn file) để chọn ảnh.
+     *
+     * @param allowMultiple Cho phép chọn nhiều file (cho Backdrop) hay không.
+     * @return File (hoặc file đầu tiên nếu chọn nhiều) hoặc null.
+     */
     private File showImageFileChooser(boolean allowMultiple) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle(allowMultiple ? configService.getString("itemImageUpdater", "selectBackdropsTitle") : configService.getString("itemImageUpdater", "selectPrimaryTitle"));
@@ -557,30 +612,22 @@ public class ItemDetailController {
         );
         if (allowMultiple) {
             List<File> files = fileChooser.showOpenMultipleDialog(getStage());
-            return (files != null && !files.isEmpty()) ? files.get(0) : null; // (Tạm thời vẫn chỉ 1 file)
+            return (files != null && !files.isEmpty()) ? files.get(0) : null;
         } else {
             return fileChooser.showOpenDialog(getStage());
         }
     }
 
     /**
-     * (MỚI) Helper dùng JsonFileHandler đã được inject.
+     * Lấy Stage (cửa sổ) hiện tại của control này.
      */
-    private File showJsonFileChooser(boolean isOpen) {
-        if (isOpen) {
-            return jsonFileHandler.showOpenJsonDialog(getStage());
-        } else {
-            // (Cần cải thiện tên file động)
-            return jsonFileHandler.showSaveJsonDialog(getStage(), "item.json");
-        }
-    }
-
     private Stage getStage() {
         return (Stage) rootPane.getScene().getWindow();
     }
 
     /**
-     * Xử lý hotkey ENTER từ AppNavigator/MainController.
+     * Xử lý hotkey ENTER (UR-13) được gọi từ AppNavigator/MainController.
+     * Ủy thác cho ViewModel.
      */
     public void handleRepeatAddTagHotkey() {
         if (viewModel != null) {
@@ -589,7 +636,8 @@ public class ItemDetailController {
     }
 
     /**
-     * Xử lý hotkey CMD+S từ AppNavigator/MainController.
+     * Xử lý hotkey CMD+S (UR-13) được gọi từ AppNavigator/MainController.
+     * Ủy thác cho ViewModel.
      */
     public void handleSaveHotkey() {
         if (viewModel != null && !viewModel.isDirtyProperty().get()) {
@@ -600,9 +648,11 @@ public class ItemDetailController {
             viewModel.saveChangesCommand();
         }
     }
+
     /**
-     * Xử lý hotkey CMD+ENTER từ AppNavigator (chỉ dùng cho pop-out).
-     * (UR-27, UR-39).
+     * Xử lý hotkey CMD+ENTER (UR-13, UR-27, UR-39) được gọi từ AppNavigator.
+     * Chỉ dùng cho cửa sổ Pop-out.
+     * Ủy thác cho ViewModel.
      */
     public void handlePlayHotkey() {
         // Chỉ gọi command nếu item không phải là thư mục
