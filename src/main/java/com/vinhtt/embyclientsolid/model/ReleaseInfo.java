@@ -3,8 +3,8 @@ package com.vinhtt.embyclientsolid.model;
 import java.time.OffsetDateTime;
 
 /**
- * POJO chứa kết quả trả về từ API lấy ngày phát hành (UR-38).
- * Thay thế cho inner class 'FetchDateResult' trong RequestEmby cũ.
+ * Lớp POJO (Đối tượng Java cũ đơn giản) chứa kết quả trả về
+ * từ `IExternalDataService` (API bên ngoài lấy ngày phát hành) (UR-38).
  */
 public class ReleaseInfo {
 
@@ -23,14 +23,18 @@ public class ReleaseInfo {
     }
 
     /**
-     * @return Ngày phát hành.
+     * Lấy ngày phát hành.
+     *
+     * @return Ngày phát hành (OffsetDateTime), hoặc null.
      */
     public OffsetDateTime getReleaseDate() {
         return releaseDate;
     }
 
     /**
-     * @return Tên diễn viên.
+     * Lấy tên diễn viên.
+     *
+     * @return Tên diễn viên (String), hoặc null.
      */
     public String getActressName() {
         return actressName;

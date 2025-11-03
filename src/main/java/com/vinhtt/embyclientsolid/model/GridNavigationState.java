@@ -3,24 +3,23 @@ package com.vinhtt.embyclientsolid.model;
 import java.util.Objects;
 
 /**
- * POJO lưu trữ một trạng thái điều hướng của ItemGridView.
- * Dùng cho chức năng "Back" và "Forward" (UR-29, UR-13, UR-14).
- * Đã cập nhật để sử dụng 'Tag' thay vì 'TagModel'.
- *
- * (Cập nhật: Thêm ScrollAction enum).
+ * Lớp POJO (Đối tượng Java cũ đơn giản) lưu trữ trạng thái của ItemGridView (Cột 2)
+ * tại một thời điểm cụ thể.
+ * Được sử dụng để triển khai chức năng "Back" (Lùi) và "Forward" (Tiến) (UR-29, UR-13, UR-14).
  */
 public class GridNavigationState {
 
     /**
-     * Enum báo hiệu hành động cuộn cần thực hiện sau khi tải trang mới.
-     * (Được chuyển từ ItemGridViewModel cũ).
+     * Enum xác định hành động cuộn (scroll) cần thực hiện
+     * sau khi tải trang mới (ví dụ: cuộn lên đầu trang).
      */
     public enum ScrollAction {
         NONE, SCROLL_TO_TOP, SCROLL_TO_BOTTOM
     }
 
     /**
-     * Định nghĩa các loại trạng thái điều hướng.
+     * Enum định nghĩa các loại trạng thái điều hướng
+     * (ví dụ: đang xem thư mục, tìm kiếm, hay lọc theo chip).
      */
     public enum StateType {
         /**
@@ -32,25 +31,34 @@ public class GridNavigationState {
          */
         SEARCH,
         /**
-         * Đang xem kết quả click chip (dùng chip, chipType).
+         * Đang xem kết quả lọc theo chip (dùng đối tượng chip).
          */
         CHIP
     }
 
+    // Kiểu trạng thái (FOLDER, SEARCH, hay CHIP)
     private final StateType type;
-    private final String primaryParam; // Dùng cho parentId (FOLDER) hoặc searchKeywords (SEARCH)
-    private final Tag chip;          // Dùng cho CHIP (thay thế TagModel)
-    private final String chipType;   // Dùng cho CHIP
+
+    // Tham số chính (dùng cho FOLDER (parentId) hoặc SEARCH (searchKeywords))
+    private final String primaryParam;
+
+    // Tham số chip (dùng cho CHIP (Tag, Studio, People...))
+    private final Tag chip;
+    private final String chipType;
+
+    // Thông tin sắp xếp và phân trang
     private final String sortBy;
     private final String sortOrder;
     private final int pageIndex;
-    private final String selectedItemId; // ID của item đang được chọn
+
+    // Item đang được chọn (để khôi phục)
+    private final String selectedItemId;
 
     /**
-     * Constructor cho FOLDER và SEARCH.
+     * Khởi tạo trạng thái cho điều hướng FOLDER (Thư mục) hoặc SEARCH (Tìm kiếm).
      *
-     * @param type           FOLDER hoặc SEARCH.
-     * @param primaryParam   ID thư mục hoặc từ khóa tìm kiếm.
+     * @param type           Kiểu trạng thái (FOLDER hoặc SEARCH).
+     * @param primaryParam   ID thư mục (nếu là FOLDER) hoặc từ khóa tìm kiếm (nếu là SEARCH).
      * @param sortBy         Tiêu chí sắp xếp.
      * @param sortOrder      Thứ tự sắp xếp.
      * @param pageIndex      Chỉ số trang (0-based).
@@ -68,9 +76,9 @@ public class GridNavigationState {
     }
 
     /**
-     * Constructor cho CHIP (UR-36).
+     * Khởi tạo trạng thái cho điều hướng CHIP (lọc theo Tag, Studio, People, Genre) (UR-36).
      *
-     * @param type           CHIP.
+     * @param type           Kiểu trạng thái (luôn là CHIP).
      * @param chip           Đối tượng Tag (hoặc Studio, People, Genre) đã được click.
      * @param chipType       Loại chip (ví dụ: "TAG", "STUDIO").
      * @param sortBy         Tiêu chí sắp xếp.
@@ -89,16 +97,20 @@ public class GridNavigationState {
         this.selectedItemId = selectedItemId;
     }
 
-    // Getters
+    // --- Getters ---
     public StateType getType() { return type; }
     public String getPrimaryParam() { return primaryParam; }
-    public Tag getChip() { return chip; } // Trả về Tag
+    public Tag getChip() { return chip; }
     public String getChipType() { return chipType; }
     public String getSortBy() { return sortBy; }
     public String getSortOrder() { return sortOrder; }
     public int getPageIndex() { return pageIndex; }
     public String getSelectedItemId() { return selectedItemId; }
 
+    /**
+     * Ghi đè (override) phương thức equals để so sánh hai trạng thái.
+     * Hai trạng thái là giống hệt nhau nếu tất cả các trường đều giống nhau.
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -114,6 +126,9 @@ public class GridNavigationState {
                 Objects.equals(selectedItemId, that.selectedItemId);
     }
 
+    /**
+     * Ghi đè (override) phương thức hashCode.
+     */
     @Override
     public int hashCode() {
         return Objects.hash(type, primaryParam, chip, chipType, sortBy, sortOrder, pageIndex, selectedItemId);

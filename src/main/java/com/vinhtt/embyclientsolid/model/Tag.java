@@ -7,24 +7,29 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Lớp Model đại diện cho một Tag đã được phân tích.
- * Thay thế cho 'TagModel' trong kiến trúc cũ.
- * Lớp này là một POJO thuần túy, không chứa logic nghiệp vụ.
- * Nó có thể là một chuỗi đơn giản, hoặc một cặp Key-Value từ JSON.
- * Bao gồm trường 'id' để lưu ID gốc từ Emby (nếu có).
+ * Lớp Model (POJO) cốt lõi đại diện cho một Tag (hoặc Studio, People, Genre).
+ * Lớp này xử lý logic phân tích (parse) và tuần tự hóa (serialize)
+ * giữa chuỗi thô (String) nhận từ API Emby và đối tượng Tag.
+ *
+ * Một Tag có thể là:
+ * 1. Dạng chuỗi đơn giản (ví dụ: "Beautiful Girl").
+ * 2. Dạng Key-Value (JSON) (ví dụ: chuỗi "{\"Body\":\"Slim\"}").
+ *
+ * Lớp này cũng lưu trữ 'id' gốc từ Emby (nếu có).
  */
 public class Tag {
 
+    // Đối tượng Gson tĩnh để parse JSON
     private static final Gson gson = new Gson();
 
     private final boolean isJson;
-    private final String simpleName;
-    private final String key;
-    private final String value;
-    private final String id;
+    private final String simpleName; // Chỉ dùng nếu isJson = false
+    private final String key;        // Chỉ dùng nếu isJson = true
+    private final String value;      // Chỉ dùng nếu isJson = true
+    private final String id;         // ID gốc từ Emby (có thể là null)
 
     /**
-     * Constructor cho tag chuỗi đơn giản.
+     * Khởi tạo một Tag dạng chuỗi đơn giản (Simple).
      *
      * @param simpleName Tên hiển thị (ví dụ: "Beautiful Girl").
      * @param id         ID gốc từ Emby (có thể là null).
@@ -38,7 +43,7 @@ public class Tag {
     }
 
     /**
-     * Constructor cho tag Key-Value (JSON).
+     * Khởi tạo một Tag dạng Key-Value (JSON).
      *
      * @param key   Key (ví dụ: "Body").
      * @param value Value (ví dụ: "Slim").
@@ -53,8 +58,8 @@ public class Tag {
     }
 
     /**
-     * Phân tích một chuỗi 'Name' (từ NameLongIdPair) thành một Tag object.
-     * Tự động phát hiện JSON.
+     * Phân tích (parse) một chuỗi 'Name' (từ API) thành một đối tượng Tag,
+     * tự động phát hiện JSON.
      *
      * @param rawName Chuỗi thô từ API (ví dụ: "Beautiful Girl" hoặc "{\"Body\":\"Slim\"}").
      * @return Một đối tượng Tag.
@@ -64,15 +69,17 @@ public class Tag {
     }
 
     /**
-     * Phân tích một chuỗi 'Name' và lưu trữ ID.
+     * Phân tích (parse) một chuỗi 'Name' (từ API) và gán ID (nếu có)
+     * vào đối tượng Tag.
      *
      * @param rawName Chuỗi thô từ API.
-     * @param id      ID gốc từ Emby.
+     * @param id      ID gốc từ Emby (có thể là null).
      * @return Một đối tượng Tag.
      */
     public static Tag parse(String rawName, String id) {
         if (rawName == null || rawName.isEmpty()) {
-            return new Tag("Trống", id); // Giá trị mặc định nếu rỗng
+            // Trả về giá trị mặc định nếu chuỗi rỗng
+            return new Tag("Trống", id);
         }
 
         // Kiểm tra xem có phải là chuỗi JSON thô hay không
@@ -81,7 +88,7 @@ public class Tag {
                 // Thử parse JSON
                 JsonObject jsonObject = gson.fromJson(rawName, JsonObject.class);
 
-                // Lấy entry ĐẦU TIÊN
+                // Lấy entry (cặp key-value) ĐẦU TIÊN
                 Map.Entry<String, com.google.gson.JsonElement> firstEntry = jsonObject.entrySet().stream().findFirst().orElse(null);
 
                 if (firstEntry != null) {
@@ -89,7 +96,8 @@ public class Tag {
                     return new Tag(firstEntry.getKey(), firstEntry.getValue().getAsString(), id);
                 }
             } catch (JsonSyntaxException | IllegalStateException e) {
-                // Không phải JSON hợp lệ, coi như chuỗi thường
+                // Không phải JSON hợp lệ (ví dụ: chuỗi chứa "{"),
+                // coi như chuỗi thường và đi xuống dưới.
             }
         }
 
@@ -99,24 +107,27 @@ public class Tag {
 
 
     /**
-     * Chuyển đổi Tag này TRỞ LẠI thành chuỗi String để LƯU vào DTO (trường TagItems).
+     * Chuyển đổi đối tượng Tag này TRỞ LẠI thành chuỗi String (đã tuần tự hóa)
+     * để LƯU vào DTO (ví dụ: `BaseItemDto.TagItems`).
      *
-     * @return Chuỗi đã được serialize.
+     * @return Chuỗi đã được serialize (ví dụ: "Beautiful Girl" hoặc "{\"Body\":\"Slim\"}").
      */
     public String serialize() {
         if (isJson) {
+            // Nếu là JSON, tạo lại đối tượng JSON
             JsonObject jsonObject = new JsonObject();
             jsonObject.addProperty(key, value);
             return gson.toJson(jsonObject);
         } else {
+            // Nếu là Simple, trả về tên
             return simpleName;
         }
     }
 
     /**
-     * Lấy chuỗi hiển thị cho UI (ví dụ: "Body | Slim" hoặc "Beautiful Girl").
+     * Lấy chuỗi hiển thị cho UI (ví dụ: trong TagChip).
      *
-     * @return Chuỗi để hiển thị.
+     * @return Chuỗi để hiển thị (ví dụ: "Body | Slim" hoặc "Beautiful Girl").
      */
     public String getDisplayName() {
         if (isJson) {
@@ -127,33 +138,45 @@ public class Tag {
     }
 
     /**
-     * @return True nếu tag này là dạng Key-Value (JSON).
+     * Kiểm tra xem Tag này có phải là dạng Key-Value (JSON) không.
+     *
+     * @return true nếu tag này là dạng Key-Value (JSON).
      */
     public boolean isJson() {
         return isJson;
     }
 
     /**
-     * @return Key (chỉ cho tag JSON).
+     * Lấy Key (chỉ cho tag JSON).
+     *
+     * @return Key (hoặc null nếu là tag Simple).
      */
     public String getKey() {
         return key;
     }
 
     /**
-     * @return Value (chỉ cho tag JSON).
+     * Lấy Value (chỉ cho tag JSON).
+     *
+     * @return Value (hoặc null nếu là tag Simple).
      */
     public String getValue() {
         return value;
     }
 
     /**
-     * @return ID gốc từ Emby (nếu có).
+     * Lấy ID gốc từ Emby (nếu có).
+     *
+     * @return ID (hoặc null).
      */
     public String getId() {
         return id;
     }
 
+    /**
+     * Ghi đè (override) phương thức equals để so sánh các Tag.
+     * Hai Tag là giống hệt nhau nếu tất cả các trường (bao gồm cả ID) đều giống nhau.
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -166,11 +189,17 @@ public class Tag {
                 Objects.equals(id, tag.id); // Thêm ID vào so sánh
     }
 
+    /**
+     * Ghi đè (override) phương thức hashCode.
+     */
     @Override
     public int hashCode() {
         return Objects.hash(isJson, simpleName, key, value, id); // Thêm ID vào hash
     }
 
+    /**
+     * Ghi đè (override) phương thức toString (dùng chủ yếu để debug).
+     */
     @Override
     public String toString() {
         return "Tag{" + getDisplayName() + (id != null ? ", id=" + id : "") + "}";

@@ -8,20 +8,23 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * Model POJO đơn giản hóa cho các đối tượng gợi ý như Genre, Studio, People.
- * (Cập nhật: Thêm constructor (String, String, String) để sửa lỗi biên dịch).
+ * Lớp POJO (Đối tượng Java cũ đơn giản) đại diện cho một mục gợi ý (suggestion)
+ * (ví dụ: Genre, Studio, People) được hiển thị trong AddTagDialog.
+ * Đây là phiên bản đơn giản hóa của BaseItemDto, chỉ chứa thông tin cần thiết cho UI.
  */
 public class SuggestionItem {
 
     private final String id;
     private final String name;
     private final String type;
+    // (Các trường này hiện không dùng nhưng để tương thích với DTO gốc)
     private final Map<String, String> imageTags;
     private final List<String> backdropImageTags;
 
     /**
-     * Khởi tạo từ một DTO.
-     * @param dto DTO từ Emby API.
+     * Khởi tạo một SuggestionItem từ một BaseItemDto (lấy từ API Emby).
+     *
+     * @param dto DTO (BaseItemDto) từ Emby API.
      */
     public SuggestionItem(BaseItemDto dto) {
         this.id = dto.getId();
@@ -32,12 +35,12 @@ public class SuggestionItem {
     }
 
     /**
-     * (MỚI - SỬA LỖI) Khởi tạo từ các giá trị thô.
-     * Dùng để tạo SuggestionItem từ một đối tượng Tag (không phải BaseItemDto).
+     * Khởi tạo một SuggestionItem từ các giá trị thô
+     * (ví dụ: khi chuyển đổi từ một `Tag` đơn giản không có DTO đầy đủ).
      *
      * @param name Tên hiển thị.
      * @param id ID (có thể null).
-     * @param type Loại (ví dụ: "Tag").
+     * @param type Loại (ví dụ: "Tag", "Studio").
      */
     public SuggestionItem(String name, String id, String type) {
         this.name = name;
@@ -49,8 +52,10 @@ public class SuggestionItem {
 
 
     /**
-     * Chuyển đổi một danh sách DTOs thành danh sách SuggestionItems.
-     * @param dtoList Danh sách DTO.
+     * Hàm helper tĩnh để chuyển đổi một danh sách DTOs (từ API)
+     * thành danh sách SuggestionItems (dùng cho UI).
+     *
+     * @param dtoList Danh sách DTO (BaseItemDto).
      * @return Danh sách SuggestionItem.
      */
     public static List<SuggestionItem> fromBaseItemDtoList(List<BaseItemDto> dtoList) {
@@ -61,28 +66,36 @@ public class SuggestionItem {
                 .collect(Collectors.toList());
     }
 
-    // Getters
+    // --- Getters ---
     public String getId() { return id; }
     public String getName() { return name; }
     public String getType() { return type; }
 
+    /**
+     * Trả về chuỗi hiển thị cho UI (ví dụ: trong chip gợi ý).
+     */
     @Override
     public String toString() {
         return name + " (" + type + ")";
     }
 
+    /**
+     * Ghi đè (override) phương thức equals để so sánh các item.
+     * So sánh dựa trên Name, Type, và ID (nếu có).
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         SuggestionItem that = (SuggestionItem) o;
-        // So sánh dựa trên Name và Type (ID có thể null cho các tag/genre đơn giản)
-        // và ID (nếu có)
         return Objects.equals(name, that.name) &&
                 Objects.equals(type, that.type) &&
                 Objects.equals(id, that.id);
     }
 
+    /**
+     * Ghi đè (override) phương thức hashCode.
+     */
     @Override
     public int hashCode() {
         return Objects.hash(name, type, id);
