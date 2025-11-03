@@ -75,6 +75,8 @@ public class AppNavigator implements IAppNavigator {
 
     private Stage detailDialog; // Cho UR-50
     private IItemDetailViewModel popOutDetailViewModel;
+    private IItemGridViewModel mainGridVM;
+    private IItemDetailViewModel mainDetailVM;
 
     // Các hằng số để lưu vị trí/kích thước cửa sổ pop-out
     private static final String KEY_DIALOG_WIDTH = "popOutDialogWidth";
@@ -164,6 +166,9 @@ public class AppNavigator implements IAppNavigator {
                     libraryTreeViewModel,
                     configService
             );
+
+            this.mainGridVM = itemGridViewModel;
+            this.mainDetailVM = itemDetailViewModel;
 
             // 3. Tạo MainController và tiêm
             MainController controller = new MainController(
@@ -395,11 +400,12 @@ public class AppNavigator implements IAppNavigator {
                                          MainController mainController,
                                          ItemDetailController detailController,
                                          ItemGridController gridController,
-                                         IItemGridViewModel gridViewModel) // Sửa: Dùng IItemGridViewModel
+                                         IItemGridViewModel gridViewModel)
     {
         if (scene == null) return;
 
-        // ENTER (Repeat Add Tag)
+        // --- ENTER (Repeat Add Tag) ---
+        // (Sẽ dùng Cột 3 (chính) hoặc Cột 3 (pop-up) tùy theo focus)
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ENTER && !event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown()) {
                 Node focusedNode = scene.getFocusOwner();
@@ -409,65 +415,88 @@ public class AppNavigator implements IAppNavigator {
 
                 if (focusedNode == null || !isBlockingControl) {
                     if (detailController != null) {
+                        // Nếu scene này có detailController (scene chính HOẶC pop-up)
                         detailController.handleRepeatAddTagHotkey();
                         event.consume();
+                    } else if (this.mainDetailVM != null) {
+                        // Fallback: Nếu scene (ví dụ Grid) k có, gọi Cột 3 (chính)
+                        this.mainDetailVM.repeatAddChipCommand();
+                        event.consume();
                     }
-                    // (Không cần fallback về mainController, vì detailController luôn tồn tại)
                 }
             }
         });
 
-        // CMD+S (Save)
+        // --- CMD+S (Save) ---
+        // (Sẽ dùng Cột 3 (chính) hoặc Cột 3 (pop-up) tùy theo focus)
         final KeyCombination saveShortcut = new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN);
         scene.getAccelerators().put(saveShortcut, () -> {
             if (detailController != null) {
+                // Lưu Cột 3 (chính) hoặc Cột 3 (pop-up)
                 detailController.handleSaveHotkey();
+            } else if (this.mainDetailVM != null) {
+                // Fallback: Lưu Cột 3 (chính)
+                this.mainDetailVM.saveChangesCommand();
             }
         });
 
-        // (Các phím tắt cho Grid)
-        if (gridViewModel != null) {
+        // --- CMD+ENTER (Play) ---
+        // (Sẽ dùng Cột 2 (chính) hoặc Cột 3 (pop-up) tùy theo focus)
+        final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
+        scene.getAccelerators().put(playShortcut, () -> {
+            if (gridController != null) {
+                // Scene chính: Hotkey "Play" gọi Grid Controller (Cột 2)
+                gridController.playSelectedItem();
+            } else if (detailController != null) {
+                // Scene Pop-up: Hotkey "Play" gọi Detail Controller (Cột 3)
+                detailController.handlePlayHotkey();
+            } else if (this.mainGridVM != null) {
+                // Fallback: Gọi Cột 2 (chính)
+                BaseItemDto selectedItem = this.mainGridVM.selectedItemProperty().get();
+                if (selectedItem != null) {
+                    this.mainGridVM.playItemCommand(selectedItem);
+                }
+            }
+        });
+
+
+        // --- Phím tắt CỘT 2 (Grid) (Luôn gọi 'mainGridVM') ---
+        if (this.mainGridVM != null) {
+            // CMD+N (Next)
             final KeyCombination nextShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN);
-            scene.getAccelerators().put(nextShortcut, gridViewModel::selectNextItem);
+            scene.getAccelerators().put(nextShortcut, this.mainGridVM::selectNextItem);
 
+            // CMD+P (Previous)
             final KeyCombination prevShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN);
-            scene.getAccelerators().put(prevShortcut, gridViewModel::selectPreviousItem);
+            scene.getAccelerators().put(prevShortcut, this.mainGridVM::selectPreviousItem);
 
+            // (MỚI) CMD+SHIFT+N (Next and Play)
             final KeyCombination nextAndPlayShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
-            scene.getAccelerators().put(nextAndPlayShortcut, gridViewModel::selectAndPlayNextItem);
+            scene.getAccelerators().put(nextAndPlayShortcut, this.mainGridVM::selectAndPlayNextItem);
 
+            // (MỚI) CMD+SHIFT+P (Previous and Play)
             final KeyCombination prevAndPlayShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
-            scene.getAccelerators().put(prevAndPlayShortcut, gridViewModel::selectAndPlayPreviousItem);
+            scene.getAccelerators().put(prevAndPlayShortcut, this.mainGridVM::selectAndPlayPreviousItem);
 
             // BACK/FORWARD (ALT+LEFT/RIGHT)
             final KeyCombination backShortcutWin = new KeyCodeCombination(KeyCode.LEFT, KeyCombination.ALT_DOWN);
             scene.getAccelerators().put(backShortcutWin, () -> {
-                if (gridViewModel.canGoBackProperty().get()) gridViewModel.navigateBack();
+                if (this.mainGridVM.canGoBackProperty().get()) this.mainGridVM.navigateBack();
             });
             final KeyCombination forwardShortcutWin = new KeyCodeCombination(KeyCode.RIGHT, KeyCombination.ALT_DOWN);
             scene.getAccelerators().put(forwardShortcutWin, () -> {
-                if (gridViewModel.canGoForwardProperty().get()) gridViewModel.navigateForward();
+                if (this.mainGridVM.canGoForwardProperty().get()) this.mainGridVM.navigateForward();
             });
 
             // BACK/FORWARD (CMD+[ / ])
             final KeyCombination backShortcutMac = new KeyCodeCombination(KeyCode.OPEN_BRACKET, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(backShortcutMac, () -> {
-                if (gridViewModel.canGoBackProperty().get()) gridViewModel.navigateBack();
+                if (this.mainGridVM.canGoBackProperty().get()) this.mainGridVM.navigateBack();
             });
             final KeyCombination forwardShortcutMac = new KeyCodeCombination(KeyCode.CLOSE_BRACKET, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(forwardShortcutMac, () -> {
-                if (gridViewModel.canGoForwardProperty().get()) gridViewModel.navigateForward();
+                if (this.mainGridVM.canGoForwardProperty().get()) this.mainGridVM.navigateForward();
             });
-        }
-
-        // (Hotkey của Grid Controller HOẶC Detail Controller cho Pop-up)
-        final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
-        if (gridController != null) {
-            // Scene chính: Hotkey "Play" gọi Grid Controller (Cột 2)
-            scene.getAccelerators().put(playShortcut, gridController::playSelectedItem);
-        } else if (detailController != null) {
-            // Scene Pop-up: Hotkey "Play" gọi Detail Controller (Cột 3)
-            scene.getAccelerators().put(playShortcut, detailController::handlePlayHotkey);
         }
     }
 

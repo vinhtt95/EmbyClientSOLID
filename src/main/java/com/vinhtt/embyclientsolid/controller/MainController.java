@@ -206,7 +206,22 @@ public class MainController {
         // 2. Lưới -> Chi tiết
         itemGridViewModel.selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (!isChipLoading) {
-                itemDetailViewModel.loadItem(newVal);
+                itemDetailViewModel.loadItem(newVal); // Tải chi tiết
+
+                // (MỚI) Xử lý tự động "Play" (Cmd+Shift+N/P)
+                if (itemGridViewModel.isPlayAfterSelect()) {
+                    if (newVal != null && Boolean.FALSE.equals(newVal.isIsFolder())) {
+
+                        // 1. Gọi Play (GridVM sẽ phát âm thanh/mở file)
+                        itemGridViewModel.playItemCommand(newVal);
+
+                        // 2. Báo cho Cột 3 (DetailVM) kích hoạt cờ Pop-out
+                        // (Vì playItemCommand của GridVM không thể làm điều này)
+                        itemDetailViewModel.openFileOrFolderCommand();
+                    }
+                    // Xóa cờ
+                    itemGridViewModel.clearPlayAfterSelect();
+                }
             }
         });
 
