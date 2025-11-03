@@ -407,10 +407,18 @@ public class MainController {
                         }
                     }
                 }
-
-                // (Các hotkey khác của GĐ 12 sẽ được thêm ở đây)
-
             });
+            // Di chuyển logic từ registerGlobalHotkeys() vào đây
+            // để đảm bảo nó được gọi.
+            if (appNavigator != null) {
+                appNavigator.registerHotkeys(
+                        scene,
+                        this,
+                        this.itemDetailController,
+                        this.itemGridController,
+                        this.itemGridViewModel
+                );
+            }
         });
     }
 
