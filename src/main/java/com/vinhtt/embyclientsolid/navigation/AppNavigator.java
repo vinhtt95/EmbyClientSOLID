@@ -300,9 +300,6 @@ public class AppNavigator implements IAppNavigator {
                 detailDialog = new Stage();
                 detailDialog.setTitle(configService.getString("itemDetailView", "popOutTitle"));
 
-                // Đặt Owner cho dialog
-                // Điều này tự động đóng dialog khi cửa sổ chính (primaryStage) đóng.
-                detailDialog.initOwner(primaryStage);
                 detailDialog.initModality(Modality.NONE);
 
                 // 6. Lấy kích thước/vị trí đã lưu (UR-50)

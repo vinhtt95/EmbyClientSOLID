@@ -111,6 +111,11 @@ public class MainApp extends Application {
             preferenceService.putDouble("windowHeight", primaryStage.getHeight());
             preferenceService.flush();
             // (Chúng ta có thể thêm logic shutdown hook cho các service ở đây nếu cần)
+            // Khi cửa sổ chính đóng, cũng phải đóng
+            // cửa sổ pop-out (nếu nó đang mở).
+            if (appNavigator != null) {
+                appNavigator.closePopOutDetail();
+            }
         });
     }
 
