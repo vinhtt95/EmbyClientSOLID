@@ -368,8 +368,7 @@ public class AppNavigator implements IAppNavigator {
 
             // Hiện lại cột detail khi đóng dialog
             if (this.mainControllerRef != null) {
-                this.mainControllerRef.showDetailColumn();
-                this.mainControllerRef = null; // Xóa tham chiếu
+                this.mainControllerRef.hideDetailColumn();
             }
 
             detailDialog.show();
