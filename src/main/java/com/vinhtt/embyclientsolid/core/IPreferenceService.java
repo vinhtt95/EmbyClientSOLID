@@ -2,14 +2,13 @@ package com.vinhtt.embyclientsolid.core;
 
 /**
  * Interface trừu tượng hóa việc đọc và ghi
- * các cài đặt cố định của người dùng (ví dụ: java.util.prefs).
+ * các cài đặt cố định của người dùng (ví dụ: sử dụng java.util.prefs).
  * Dùng để lưu trữ session token, URL máy chủ, và vị trí/kích thước cửa sổ.
- * (UR-2, UR-4, UR-6, UR-8, UR-50).
  */
 public interface IPreferenceService {
 
     /**
-     * Lấy một giá trị chuỗi từ preferences.
+     * Lấy một giá trị chuỗi (String) từ preferences.
      *
      * @param key          Khóa của giá trị.
      * @param defaultValue Giá trị trả về nếu không tìm thấy khóa.
@@ -18,10 +17,10 @@ public interface IPreferenceService {
     String getString(String key, String defaultValue);
 
     /**
-     * Lưu một giá trị chuỗi vào preferences.
+     * Lưu một giá trị chuỗi (String) vào preferences.
      *
      * @param key   Khóa để lưu.
-     * @param value Giá trị để lưu.
+     * @param value Giá trị để lưu (nếu là null, khóa sẽ bị xóa).
      */
     void putString(String key, String value);
 
@@ -43,14 +42,14 @@ public interface IPreferenceService {
     void putDouble(String key, double value);
 
     /**
-     * Xóa một khóa khỏi preferences.
+     * Xóa một khóa (key) khỏi preferences.
      *
      * @param key Khóa cần xóa.
      */
     void remove(String key);
 
     /**
-     * Đảm bảo tất cả các thay đổi được ghi vào bộ lưu trữ cố định.
+     * Đảm bảo tất cả các thay đổi được ghi vào bộ lưu trữ cố định (persistent storage).
      */
     void flush();
 }

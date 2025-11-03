@@ -7,40 +7,44 @@ import embyclient.ApiException;
 import java.util.List;
 
 /**
- * Interface cho việc ĐỌC (Query) dữ liệu tĩnh hoặc dữ liệu gợi ý.
- * (UR-35).
- * (Cập nhật: Sửa kiểu trả về để hỗ trợ JSON cho tất cả các loại).
+ * Interface trừu tượng hóa việc ĐỌC (Query) dữ liệu tĩnh
+ * hoặc dữ liệu gợi ý (suggestions) từ Emby.
+ * Dùng để điền dữ liệu cho dialog AddTag.
  */
 public interface IStaticDataRepository {
 
     /**
-     * Lấy danh sách tất cả các tag đã dùng trong thư viện.
-     * (UR-35).
-     * @return Danh sách các Tag (đã parse, có thể là JSON hoặc simple).
+     * Lấy danh sách tất cả các tag (đã parse, có thể là JSON hoặc simple)
+     * đã được sử dụng trong thư viện (dùng cho gợi ý).
+     *
+     * @return Danh sách các Tag (đã parse).
      * @throws ApiException Nếu API call thất bại.
      */
     List<Tag> getAllUsedTags() throws ApiException;
 
     /**
-     * Lấy danh sách Genres gợi ý.
-     * (UR-35).
-     * @return Danh sách các Tag (đã parse, có thể là JSON hoặc simple).
+     * Lấy danh sách tất cả các Genres (đã parse)
+     * đã được sử dụng trong thư viện (dùng cho gợi ý).
+     *
+     * @return Danh sách các Tag (đã parse).
      * @throws ApiException Nếu API call thất bại.
      */
     List<Tag> getGenreSuggestions() throws ApiException;
 
     /**
-     * Lấy danh sách Studios gợi ý.
-     * (UR-35).
-     * @return Danh sách các Tag (đã parse, có thể là JSON hoặc simple).
+     * Lấy danh sách tất cả các Studios (đã parse)
+     * đã được sử dụng trong thư viện (dùng cho gợi ý).
+     *
+     * @return Danh sách các Tag (đã parse).
      * @throws ApiException Nếu API call thất bại.
      */
     List<Tag> getStudioSuggestions() throws ApiException;
 
     /**
-     * Lấy danh sách People gợi ý.
-     * (UR-35).
-     * @return Danh sách các Tag (đã parse, có thể là JSON hoặc simple).
+     * Lấy danh sách tất cả các People (đã parse)
+     * đã được sử dụng trong thư viện (dùng cho gợi ý).
+     *
+     * @return Danh sách các Tag (đã parse).
      * @throws ApiException Nếu API call thất bại.
      */
     List<Tag> getPeopleSuggestions() throws ApiException;

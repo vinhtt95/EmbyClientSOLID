@@ -4,35 +4,33 @@ import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.stage.Window;
 
 /**
- * Interface trừu tượng hóa hệ thống thông báo trạng thái và xác nhận.
- * (UR-9, UR-24).
+ * Interface trừu tượng hóa hệ thống thông báo trạng thái (status bar)
+ * và hiển thị dialog xác nhận (confirmation dialog).
  */
 public interface INotificationService {
 
     /**
-     * Hiển thị một tin nhắn trên thanh trạng thái (status bar) chung.
-     * (UR-9).
+     * Hiển thị một tin nhắn trên thanh trạng thái (status bar) chung của ứng dụng.
      *
      * @param message Tin nhắn cần hiển thị.
      */
     void showStatus(String message);
 
     /**
-     * Xóa tin nhắn trên thanh trạng thái, quay về "Sẵn sàng".
+     * Xóa tin nhắn trên thanh trạng thái, quay về trạng thái "Sẵn sàng".
      */
     void clearStatus();
 
     /**
-     * Lấy Property (chỉ-đọc) chứa tin nhắn trạng thái hiện tại.
-     * Dùng để binding với Label trên MainView.
+     * Lấy thuộc tính (Property) JavaFX (chỉ-đọc) chứa tin nhắn trạng thái hiện tại.
+     * Dùng để binding (liên kết) với Label trên MainView.
      *
      * @return ReadOnlyStringProperty.
      */
     ReadOnlyStringProperty statusMessageProperty();
 
     /**
-     * Hiển thị hộp thoại xác nhận (Yes/No).
-     * (UR-24).
+     * Hiển thị hộp thoại xác nhận (Yes/No) và chờ người dùng trả lời.
      *
      * @param title Tiêu đề của hộp thoại.
      * @param content Nội dung câu hỏi.
@@ -40,5 +38,11 @@ public interface INotificationService {
      */
     boolean showConfirmation(String title, String content);
 
+    /**
+     * Thiết lập cửa sổ (Window) chủ sở hữu cho các dialog (ví dụ: dialog xác nhận).
+     * Điều này đảm bảo dialog hiển thị đúng và khóa (modal) cửa sổ cha.
+     *
+     * @param window Cửa sổ (Window) chính của ứng dụng.
+     */
     void setOwnerWindow(Window window);
 }

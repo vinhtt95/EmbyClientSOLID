@@ -7,7 +7,7 @@ import com.squareup.okhttp.RequestBody;
 import com.squareup.okhttp.Response;
 import com.vinhtt.embyclientsolid.core.IEmbySessionService;
 import com.vinhtt.embyclientsolid.data.IItemUpdateService;
-import com.vinhtt.embyclientsolid.data.IItemRepository; // Cần để đọc item
+import com.vinhtt.embyclientsolid.data.IItemRepository;
 import embyclient.ApiClient;
 import embyclient.ApiException;
 import embyclient.api.ImageServiceApi;
@@ -28,21 +28,20 @@ import java.util.Map;
 
 /**
  * Triển khai (Implementation) của IItemUpdateService.
- * Chịu trách nhiệm GHI dữ liệu: update, upload, delete, clone.
- * Logic được chuyển từ ItemDetailSaver,
- * ItemImageUpdater,
- * và RequestEmby.
+ * Chịu trách nhiệm thực thi các lệnh GHI (Command) dữ liệu: update, upload, delete, clone.
+ * Phụ thuộc vào IEmbySessionService (để ghi) và IItemRepository (để đọc khi clone).
  */
 public class EmbyItemUpdateService implements IItemUpdateService {
 
     private final IEmbySessionService sessionService;
     private final ApiClient apiClient;
-    // Cần một IItemRepository để đọc DTOs khi clone
+    // Cần IItemRepository để ĐỌC DTOs khi thực hiện logic CLONE
     private final IItemRepository itemRepository;
 
     /**
      * Khởi tạo Service.
-     * @param sessionService Service Session đã được tiêm (DI).
+     *
+     * @param sessionService Service Session (DI) để lấy ApiClient.
      * @param itemRepository Repository Đọc (DI) để lấy item khi clone.
      */
     public EmbyItemUpdateService(IEmbySessionService sessionService, IItemRepository itemRepository) {
@@ -60,21 +59,30 @@ public class EmbyItemUpdateService implements IItemUpdateService {
         return new ImageServiceApi(apiClient);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void updateItem(String itemId, BaseItemDto item) throws ApiException {
-        // Logic từ ItemDetailSaver.saveChanges
+        // Gọi API để POST (cập nhật) DTO mới
         getItemUpdateServiceApi().postItemsByItemid(item, itemId);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * Phương thức này phải sử dụng OkHttpClient tùy chỉnh vì Emby API (Swagger)
+     * không hỗ trợ upload ảnh dạng Base64.
+     */
     @Override
     public void uploadImage(String itemId, ImageType imageType, File imageFile) throws Exception {
-        // Logic từ ItemImageUpdater.uploadImage
 
         // 1. Lấy OkHttpClient (client SẠCH, chỉ có auth)
+        // Chúng ta cần client này để thêm Interceptor xác thực
         OkHttpClient client = new OkHttpClient();
         client.interceptors().add(sessionService.getAuthHeaderInterceptor());
 
-        // 2. Xác định URL
+        // 2. Xây dựng URL API upload thủ công
         String serverUrl = apiClient.getBasePath();
         if (serverUrl.endsWith("/")) {
             serverUrl = serverUrl.substring(0, serverUrl.length() - 1);
@@ -84,11 +92,11 @@ public class EmbyItemUpdateService implements IItemUpdateService {
                 itemId,
                 imageType.getValue());
 
-        // 3. Đọc byte và mã hóa Base64
+        // 3. Đọc byte ảnh và mã hóa Base64
         byte[] fileBytes = Files.readAllBytes(imageFile.toPath());
         String base64String = Base64.getEncoder().encodeToString(fileBytes);
 
-        // 4. Xác định MediaType gốc
+        // 4. Xác định MediaType (ví dụ: "image/jpeg")
         MediaType originalMediaType = getMediaType(imageFile);
         if (originalMediaType == null) {
             throw new IOException("Không hỗ trợ định dạng file ảnh: " + imageFile.getName());
@@ -118,7 +126,6 @@ public class EmbyItemUpdateService implements IItemUpdateService {
 
     /**
      * Helper lấy MediaType từ tên file.
-     *
      */
     private MediaType getMediaType(File file) {
         String name = file.getName().toLowerCase();
@@ -129,23 +136,29 @@ public class EmbyItemUpdateService implements IItemUpdateService {
         return null; // Không hỗ trợ
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void deleteImage(String itemId, ImageType imageType, Integer imageIndex) throws ApiException {
-        // Logic từ ItemImageUpdater.deleteImage
+        // Gọi API xóa ảnh
         Integer index = (imageIndex == null) ? 0 : imageIndex;
         getImageServiceApi().deleteItemsByIdImagesByTypeByIndex(itemId, index, imageType);
     }
 
     // --- CLONE METHODS ---
-    // Logic được chuyển từ RequestEmby.java
-    // và ItemService.java
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int cloneTags(String sourceItemId, String targetParentId) throws ApiException {
+        // Lấy item nguồn (để copy)
         BaseItemDto itemCopy = itemRepository.getFullItemDetails(sourceItemId);
         if (itemCopy == null) return 0;
         List<NameLongIdPair> listTagsItemCopy = itemCopy.getTagItems();
 
+        // Lấy danh sách item đích (để paste)
         List<BaseItemDto> listItemPaste = itemRepository.getItemsPaginated(targetParentId, 0, 9999, "Ascending", "SortName").getItems();
         if (listItemPaste == null || listItemPaste.isEmpty()) return 0;
 
@@ -154,7 +167,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
             BaseItemDto itemPaste = itemRepository.getFullItemDetails(eachItemPaste.getId());
             if (itemPaste == null) continue;
 
-            // Logic Merge
+            // Logic Merge: Dùng Map để merge (ghi đè) tag cũ bằng tag mới nếu trùng tên
             Map<String, NameLongIdPair> mergedTagsMap = new HashMap<>();
             if (itemPaste.getTagItems() != null) {
                 for (NameLongIdPair existingTag : itemPaste.getTagItems()) {
@@ -167,6 +180,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
                 }
             }
 
+            // Ghi đè danh sách tags và gọi API Update
             itemPaste.setTagItems(new ArrayList<>(mergedTagsMap.values()));
             updateItem(itemPaste.getId(), itemPaste);
             updateCount++;
@@ -174,12 +188,17 @@ public class EmbyItemUpdateService implements IItemUpdateService {
         return updateCount;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int cloneStudios(String sourceItemId, String targetParentId) throws ApiException {
+        // Lấy item nguồn
         BaseItemDto itemCopy = itemRepository.getFullItemDetails(sourceItemId);
         if (itemCopy == null) return 0;
         List<NameLongIdPair> listStudoItemCopy = itemCopy.getStudios();
 
+        // Lấy item đích
         List<BaseItemDto> listItemPaste = itemRepository.getItemsPaginated(targetParentId, 0, 9999, "Ascending", "SortName").getItems();
         if (listItemPaste == null || listItemPaste.isEmpty()) return 0;
 
@@ -188,6 +207,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
             BaseItemDto itemPaste = itemRepository.getFullItemDetails(eachItemPaste.getId());
             if (itemPaste == null) continue;
 
+            // Logic Merge (dùng Map)
             Map<String, NameLongIdPair> mergedStudiosMap = new HashMap<>();
             if (itemPaste.getStudios() != null) {
                 for (NameLongIdPair existing : itemPaste.getStudios()) {
@@ -200,6 +220,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
                 }
             }
 
+            // Cập nhật
             itemPaste.setStudios(new ArrayList<>(mergedStudiosMap.values()));
             updateItem(itemPaste.getId(), itemPaste);
             updateCount++;
@@ -207,12 +228,17 @@ public class EmbyItemUpdateService implements IItemUpdateService {
         return updateCount;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int clonePeople(String sourceItemId, String targetParentId) throws ApiException {
+        // Lấy item nguồn
         BaseItemDto itemCopy = itemRepository.getFullItemDetails(sourceItemId);
         if (itemCopy == null) return 0;
         List<BaseItemPerson> listPeopleItemCopy = itemCopy.getPeople();
 
+        // Lấy item đích
         List<BaseItemDto> listItemPaste = itemRepository.getItemsPaginated(targetParentId, 0, 9999, "Ascending", "SortName").getItems();
         if (listItemPaste == null || listItemPaste.isEmpty()) return 0;
 
@@ -223,6 +249,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
             BaseItemDto itemPaste = itemRepository.getFullItemDetails(eachItemPaste.getId());
             if (itemPaste == null) continue;
 
+            // Logic Merge (dùng Map)
             Map<String, BaseItemPerson> mergedPeopleMap = new HashMap<>();
             if (itemPaste.getPeople() != null) {
                 for (BaseItemPerson existing : itemPaste.getPeople()) {
@@ -235,6 +262,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
                 }
             }
 
+            // Cập nhật
             itemPaste.setPeople(new ArrayList<>(mergedPeopleMap.values()));
             updateItem(itemPaste.getId(), itemPaste);
             updateCount++;
@@ -242,12 +270,17 @@ public class EmbyItemUpdateService implements IItemUpdateService {
         return updateCount;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int cloneGenres(String sourceItemId, String targetParentId) throws ApiException {
+        // Lấy item nguồn
         BaseItemDto itemCopy = itemRepository.getFullItemDetails(sourceItemId);
         if (itemCopy == null) return 0;
         List<NameLongIdPair> listGenresItemCopy = itemCopy.getGenreItems();
 
+        // Lấy item đích
         List<BaseItemDto> listItemPaste = itemRepository.getItemsPaginated(targetParentId, 0, 9999, "Ascending", "SortName").getItems();
         if (listItemPaste == null || listItemPaste.isEmpty()) return 0;
 
@@ -256,6 +289,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
             BaseItemDto itemPaste = itemRepository.getFullItemDetails(eachItemPaste.getId());
             if (itemPaste == null) continue;
 
+            // Logic Merge (dùng Map)
             Map<String, NameLongIdPair> mergedGenresMap = new HashMap<>();
             if (itemPaste.getGenreItems() != null) {
                 for (NameLongIdPair existing : itemPaste.getGenreItems()) {
@@ -268,6 +302,7 @@ public class EmbyItemUpdateService implements IItemUpdateService {
                 }
             }
 
+            // Cập nhật
             itemPaste.setGenreItems(new ArrayList<>(mergedGenresMap.values()));
             updateItem(itemPaste.getId(), itemPaste);
             updateCount++;

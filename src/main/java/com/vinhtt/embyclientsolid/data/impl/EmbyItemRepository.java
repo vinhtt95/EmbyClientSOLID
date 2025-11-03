@@ -18,10 +18,8 @@ import java.util.List;
 
 /**
  * Triển khai (Implementation) của IItemRepository.
- * Phụ thuộc vào IEmbySessionService để lấy ApiClient.
- * <p>
- * (ĐÃ SỬA LỖI LOGIC: Tách biệt logic getItemsByParentId (cho Tree)
- * khỏi getItemsPaginated (cho Grid) theo đúng yêu cầu.)
+ * Lớp này chịu trách nhiệm thực thi các lệnh ĐỌC (Query) dữ liệu Item từ Emby API,
+ * sử dụng ApiClient được cung cấp bởi IEmbySessionService.
  */
 public class EmbyItemRepository implements IItemRepository {
 
@@ -30,9 +28,10 @@ public class EmbyItemRepository implements IItemRepository {
     private final IConfigurationService configService;
 
     /**
-     * Khởi tạo Repository với Session Service.
+     * Khởi tạo Repository.
      *
-     * @param sessionService Service đã được tiêm (DI).
+     * @param sessionService Service Session (DI) để lấy ApiClient và UserId.
+     * @param configService Service Config (DI) để lấy chuỗi (ví dụ: lỗi).
      */
     public EmbyItemRepository(IEmbySessionService sessionService, IConfigurationService configService) {
         this.sessionService = sessionService;
@@ -40,7 +39,7 @@ public class EmbyItemRepository implements IItemRepository {
         this.configService = configService;
     }
 
-    // --- Helpers để lấy API services ---
+    // --- Helpers để lấy các API service cụ thể từ ApiClient ---
     private ItemsServiceApi getItemsService() {
         return new ItemsServiceApi(apiClient);
     }
@@ -53,14 +52,17 @@ public class EmbyItemRepository implements IItemRepository {
         return new ImageServiceApi(apiClient);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<BaseItemDto> getRootViews() throws ApiException {
         String userId = sessionService.getCurrentUserId();
         if (userId == null) {
-            throw new IllegalStateException("Chưa đăng nhập. Không thể lấy root views.");
+            throw new IllegalStateException(configService.getString("exceptions", "notLoggedIn"));
         }
 
-        // Logic này đúng, lấy các thư mục gốc của User
+        // Gọi API lấy các thư mục gốc (Views) của User
         QueryResultBaseItemDto result = getItemsService().getUsersByUseridItems(userId, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         if (result != null && result.getItems() != null) {
@@ -70,17 +72,12 @@ public class EmbyItemRepository implements IItemRepository {
     }
 
     /**
-     * (SỬA LỖI LOGIC TẠI ĐÂY)
-     * Lấy các items con dựa trên parentId (dùng cho Cột 1 - Tree).
-     * Hàm này KHÔNG đệ quy (recursive=null) và lấy TẤT CẢ các loại item
-     * (includeItemTypes=null) để ViewModel có thể lọc ra các thư mục.
-     * (UR-17).
-     * <p>
-     * Logic này dựa trên RequestEmby.getQueryResultBaseItemDto từ dự án cũ.
+     * {@inheritDoc}
      */
     @Override
     public List<BaseItemDto> getItemsByParentId(String parentId) throws ApiException {
-        // Logic từ RequestEmby.getQueryResultBaseItemDto
+        // Gọi API lấy item con, không đệ quy (recursive=null/false)
+        // và sắp xếp theo SortName (dùng cho Cột 1 - Tree).
         QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 null,
                 null,
@@ -97,27 +94,30 @@ public class EmbyItemRepository implements IItemRepository {
     }
 
     /**
-     * Lấy các items con (dùng cho Cột 2 - Grid).
-     * Hàm này CÓ đệ quy (recursive=true) và chỉ lấy "Movie"
-     * (includeItemTypes="Movie").
+     * {@inheritDoc}
      */
     @Override
     public QueryResultBaseItemDto getItemsPaginated(String parentId, int startIndex, int limit, String sortOrder, String sortBy) throws ApiException {
-        // Logic từ RequestEmby.getQueryResultFullBaseItemDto
+        // Gọi API lấy item con, CÓ đệ quy (recursive=true)
+        // và chỉ lấy loại "Movie" (dùng cho Cột 2 - Grid).
         QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, startIndex, limit, true, null, sortOrder, parentId, "OfficialRating,CriticRating", null, "Movie", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, sortBy, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+
         if (result != null) {
             return result;
         }
-        // Trả về kết quả rỗng an toàn
+        // Trả về kết quả rỗng an toàn nếu API trả về null
         QueryResultBaseItemDto emptyResult = new QueryResultBaseItemDto();
         emptyResult.setItems(Collections.emptyList());
         emptyResult.setTotalRecordCount(0);
         return emptyResult;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public QueryResultBaseItemDto searchItemsPaginated(String keywords, int startIndex, int limit, String sortOrder, String sortBy) throws ApiException {
-        // Logic từ RequestEmby.searchBaseItemDto
+        // Gọi API tìm kiếm
         QueryResultBaseItemDto result = getItemsService().getItems(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 startIndex, // startIndex
                 limit, // limit
@@ -137,15 +137,19 @@ public class EmbyItemRepository implements IItemRepository {
         return emptyResult;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public QueryResultBaseItemDto getItemsByChip(Tag chip, String chipType, Integer startIndex, Integer limit, boolean recursive, String sortOrder, String sortBy) throws ApiException {
         String apiParam;
         QueryResultBaseItemDto listItems = null;
 
+        // Tùy thuộc vào loại chip, chúng ta truyền tham số API khác nhau
         switch (chipType) {
             case "TAG":
-                String tagsName;
-                tagsName = chip.serialize(); // Tag dùng tên đã serialize (JSON hoặc text)
+                // Tag dùng 'tags' (truyền chuỗi đã serialize)
+                String tagsName = chip.serialize();
                 try {
                     listItems = getItemsService().getItems(
                             null,    //artistType
@@ -248,25 +252,15 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //nameStartsWith
                             null    //nameLessThan
                     );
-                    if (listItems.getItems().isEmpty()) {
-                        System.out.println("Empty Item Tags");
-                    }
-
-                    if (!listItems.getItems().isEmpty()) {
-
-                        return listItems;
-                    }
-
                 } catch (ApiException e) {
-                    System.out.println("Error fetching tags: " + e.getMessage());
+                    System.err.println("Error fetching tags: " + e.getMessage());
                 }
                 break;
 
             case "STUDIO":
-                String studioId;
-                studioId = chip.getId(); // Studio dùng TÊN (hoặc JSON string)
-                if (studioId == null) throw new ApiException("Studio Name is null for: " + chip.getDisplayName());
-                System.out.println("studioId: " + studioId);
+                // Studio dùng 'studioIds' (truyền ID)
+                String studioId = chip.getId();
+                if (studioId == null) throw new ApiException("Studio ID is null for: " + chip.getDisplayName());
                 try {
                     listItems = getItemsService().getItems(
                             null,    //artistType
@@ -369,24 +363,16 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //nameStartsWith
                             null    //nameLessThan
                     );
-
-                    if (listItems.getItems().isEmpty()) {
-                        System.out.println("Empty Studios");
-                    }
-
-                    if (!listItems.getItems().isEmpty()) {
-
-                        return listItems;
-                    }
-
                 } catch (ApiException e) {
-                    System.out.println("Error fetching studios: " + e.getMessage());
+                    System.err.println("Error fetching studios: " + e.getMessage());
                 }
                 break;
+
             case "PEOPLE":
-                apiParam = chip.getId(); // People dùng ID
+                // People dùng 'personIds' (truyền ID)
+                apiParam = chip.getId();
                 if (apiParam == null) throw new ApiException("People ID is null for: ".concat(chip.getDisplayName()));
-                String peopleID = chip.getId(); // Genre dùng tên hiển thị
+                String peopleID = chip.getId();
                 try {
                     listItems = getItemsService().getItems(
                             null,    //artistType
@@ -489,23 +475,14 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //nameStartsWith
                             null    //nameLessThan
                     );
-
-                    if (listItems.getItems().isEmpty()) {
-                        System.out.println("Empty People");
-                    }
-
-                    if (!listItems.getItems().isEmpty()) {
-
-                        return listItems;
-                    }
                 } catch (ApiException e) {
-                    System.out.println("Error fetching people: " + e.getMessage());
+                    System.err.println("Error fetching people: " + e.getMessage());
                 }
                 break;
 
             case "GENRE":
-                String nameGenres = chip.serialize(); // Genre dùng tên hiển thị
-
+                // Genre dùng 'genres' (truyền chuỗi đã serialize)
+                String nameGenres = chip.serialize();
                 try {
                     listItems = getItemsService().getItems(
                             null,    //artistType
@@ -608,41 +585,41 @@ public class EmbyItemRepository implements IItemRepository {
                             null,    //nameStartsWith
                             null    //nameLessThan
                     );
-                    if (listItems.getItems().isEmpty()) {
-                        System.out.println("Empty Genres");
-                    }
-
-                    if (!listItems.getItems().isEmpty()) {
-
-                        return listItems;
-                    }
                 } catch (ApiException e) {
-                    System.out.println("Error fetching Genres: " + e.getMessage());
+                    System.err.println("Error fetching Genres: " + e.getMessage());
                 }
                 break;
         }
 
+        // Trả về kết quả (có thể là null) hoặc một kết quả rỗng
+        if (listItems != null) {
+            return listItems;
+        }
         QueryResultBaseItemDto emptyResult = new QueryResultBaseItemDto();
         emptyResult.setItems(Collections.emptyList());
         emptyResult.setTotalRecordCount(0);
         return emptyResult;
-
     }
 
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public BaseItemDto getFullItemDetails(String itemId) throws ApiException {
         String userId = sessionService.getCurrentUserId();
         if (userId == null) {
             throw new IllegalStateException(configService.getString("exceptions", "notLoggedIn"));
         }
-        // Logic từ ItemRepository.getFullItemDetails
+        // Gọi API lấy chi tiết item của user (để lấy được UserData)
         return getUserLibraryServiceApi().getUsersByUseridItemsById(userId, itemId);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<ImageInfo> getItemImages(String itemId) throws ApiException {
-        // Logic từ ItemRepository.getItemImages
+        // Gọi API lấy danh sách ảnh của item
         List<ImageInfo> images = getImageServiceApi().getItemsByIdImages(itemId);
         if (images != null) {
             return images;

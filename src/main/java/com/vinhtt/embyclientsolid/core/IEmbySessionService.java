@@ -8,13 +8,12 @@ import javafx.beans.property.ReadOnlyBooleanProperty;
 /**
  * Interface trừu tượng hóa việc quản lý Phiên (Session) Emby.
  * Chịu trách nhiệm cho: Đăng nhập, Đăng xuất, Khôi phục phiên,
- * và cung cấp ApiClient đã được xác thực.
- * (UR-1, UR-3, UR-4, UR-5).
+ * và cung cấp ApiClient đã được xác thực cho các service khác.
  */
 public interface IEmbySessionService {
 
     /**
-     * Cố gắng đăng nhập vào máy chủ Emby.
+     * Cố gắng đăng nhập vào máy chủ Emby bằng thông tin đăng nhập.
      *
      * @param url      URL máy chủ (ví dụ: "http://localhost:8096").
      * @param username Tên đăng nhập.
@@ -27,21 +26,19 @@ public interface IEmbySessionService {
     /**
      * Đăng xuất khỏi phiên hiện tại.
      * Xóa token đã lưu và reset ApiClient.
-     * (UR-5).
      */
     void logout();
 
     /**
-     * Cố gắng khôi phục phiên làm việc từ preferences.
-     * (UR-4).
+     * Cố gắng khôi phục phiên làm việc (tự động đăng nhập) từ bộ nhớ cố định (preferences).
      *
      * @return true nếu khôi phục thành công, false nếu thất bại.
      */
     boolean tryRestoreSession();
 
     /**
-     * Lấy ApiClient đã được cấu hình (với BasePath và Interceptor).
-     * Các service khác (ví dụ: Repository) sẽ dùng client này.
+     * Lấy ApiClient đã được cấu hình (với BasePath và Interceptor xác thực).
+     * Các service khác (ví dụ: Repository) sẽ dùng client này để gọi API.
      *
      * @return ApiClient đã cấu hình.
      */
@@ -49,30 +46,39 @@ public interface IEmbySessionService {
 
     /**
      * Lấy Interceptor xác thực (Auth Header Interceptor).
-     * Dùng cho các yêu cầu tùy chỉnh (ví dụ: upload ảnh).
+     * Dùng cho các yêu cầu tùy chỉnh (ví dụ: upload ảnh)
+     * mà không thể dùng ApiClient mặc định.
      *
      * @return Interceptor chứa X-Emby-Token.
      */
     Interceptor getAuthHeaderInterceptor();
 
     /**
-     * @return Property JavaFX cho biết trạng thái đăng nhập.
+     * Lấy thuộc tính (Property) JavaFX cho biết trạng thái đăng nhập.
+     * Dùng để binding (liên kết) trong UI.
+     *
+     * @return Thuộc tính (Property) chỉ-đọc (ReadOnlyBooleanProperty).
      */
     ReadOnlyBooleanProperty loggedInProperty();
 
     /**
-     * @return Giá trị boolean cho biết trạng thái đăng nhập.
+     * Kiểm tra trạng thái đăng nhập hiện tại.
+     *
+     * @return true nếu đã đăng nhập, false nếu chưa.
      */
     boolean isLoggedIn();
 
     /**
-     * @return ID của người dùng hiện tại, hoặc null nếu chưa đăng nhập.
+     * Lấy ID của người dùng (User) hiện tại đang đăng nhập.
+     *
+     * @return ID của người dùng, hoặc null nếu chưa đăng nhập.
      */
     String getCurrentUserId();
 
     /**
-     * @return URL máy chủ cuối cùng đã đăng nhập thành công, hoặc "" nếu chưa có.
-     * (Hỗ trợ UR-2).
+     * Lấy URL máy chủ cuối cùng đã đăng nhập thành công.
+     *
+     * @return URL máy chủ, hoặc chuỗi rỗng "" nếu chưa có.
      */
     String getLastServerUrl();
 }

@@ -15,19 +15,20 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Triển khai (Implementation) của IExternalDataService.
- * Chịu trách nhiệm gọi API bên ngoài (localhost:8081).
- * Logic được chuyển từ RequestEmby.getDateRelease.
- * (UR-38).
+ * Chịu trách nhiệm gọi API bên ngoài (ví dụ: localhost:8081)
+ * để lấy thông tin phát hành (ReleaseInfo).
  */
 public class ExternalMovieDataService implements IExternalDataService {
 
+    // URL của API bên ngoài
     private static final String API_URL_TEMPLATE = "http://localhost:8081/movies/movie/date/?movieCode=";
 
+    // Định dạng ngày tháng tùy chỉnh mà API bên ngoài có thể trả về
     private static final DateTimeFormatter LOCAL_DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S");
 
     /**
-     * Parse một chuỗi ngày tháng (có thể là ISO OffsetDateTime hoặc
+     * Helper parse chuỗi ngày tháng (có thể là ISO OffsetDateTime hoặc
      * định dạng LocalDateTime tùy chỉnh) về OffsetDateTime.
      *
      * @param dateValue Chuỗi ngày tháng từ API.
@@ -58,11 +59,15 @@ public class ExternalMovieDataService implements IExternalDataService {
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public ReleaseInfo fetchReleaseInfoByCode(String itemCode) {
         String apiUrl = API_URL_TEMPLATE + itemCode;
         HttpURLConnection connection = null;
         try {
+            // Thực hiện gọi GET request bằng HttpURLConnection
             URL url = new URL(apiUrl);
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
@@ -72,16 +77,19 @@ public class ExternalMovieDataService implements IExternalDataService {
 
             int responseCode = connection.getResponseCode();
             if (responseCode == 200) {
+                // Đọc response
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
                     StringBuilder response = new StringBuilder();
                     String line;
                     while ((line = reader.readLine()) != null) {
                         response.append(line);
                     }
+                    // Parse JSON
                     JSONObject jsonResponse = new JSONObject(response.toString());
 
                     JSONObject dataObject = jsonResponse.optJSONObject("data");
                     if (dataObject != null) {
+                        // Lấy các trường từ object "data"
                         String dateValue = dataObject.optString("releaseDate", null);
                         String actressName = dataObject.optString("actressName", null);
 
@@ -89,6 +97,7 @@ public class ExternalMovieDataService implements IExternalDataService {
                         return new ReleaseInfo(odt, actressName);
 
                     } else {
+                        // Xử lý trường hợp API cũ chỉ trả về ngày tháng trong "data"
                         String dataValue = jsonResponse.optString("data", null);
                         OffsetDateTime odt = parseFlexibleDate(dataValue);
                         return new ReleaseInfo(odt, null);
