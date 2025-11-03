@@ -21,6 +21,7 @@ import com.vinhtt.embyclientsolid.viewmodel.impl.ItemGridViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.impl.LibraryTreeViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.impl.LoginViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.impl.MainViewModel;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -312,6 +313,23 @@ public class AppNavigator implements IAppNavigator {
                 // (Chỉ truyền vào các thành phần mà pop-out có)
                 registerHotkeysForScene(scene, null, controller, null, null);
 
+                final IItemDetailViewModel vm = this.popOutDetailViewModel;
+                final Stage stage = detailDialog;
+
+                vm.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
+                    if (newCtx != null) {
+                        // Gọi hàm showAddTagDialog của chính AppNavigator
+                        AddTagResult result = showAddTagDialog(stage, newCtx);
+
+                        // (Sửa lỗi focus: Trả focus về stage pop-up)
+                        Platform.runLater(root::requestFocus);
+
+                        // Gửi kết quả (hoặc null) trở lại ViewModel
+                        vm.processAddTagResult(result, newCtx);
+                        vm.clearAddChipCommand();
+                    }
+                });
+
                 // 9. Lưu kích thước khi đóng (UR-50)
                 detailDialog.setOnCloseRequest(e -> {
                     preferenceService.putDouble(KEY_DIALOG_WIDTH, detailDialog.getWidth());
@@ -442,10 +460,14 @@ public class AppNavigator implements IAppNavigator {
             });
         }
 
-        // (Hotkey của Grid Controller)
+        // (Hotkey của Grid Controller HOẶC Detail Controller cho Pop-up)
+        final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
         if (gridController != null) {
-            final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
+            // Scene chính: Hotkey "Play" gọi Grid Controller (Cột 2)
             scene.getAccelerators().put(playShortcut, gridController::playSelectedItem);
+        } else if (detailController != null) {
+            // Scene Pop-up: Hotkey "Play" gọi Detail Controller (Cột 3)
+            scene.getAccelerators().put(playShortcut, detailController::handlePlayHotkey);
         }
     }
 

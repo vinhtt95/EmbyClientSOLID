@@ -12,7 +12,7 @@
 - [x] Giai đoạn 10: Cột Chi tiết (Detail View + VM)
 - [x] Giai đoạn 11: Dialog Thêm Tag (Dialog + VM)
 - [x] Giai đoạn 12: Hoàn thiện Phím tắt & Pop-out
-- [ ] Giai đoạn 13: Hoàn thiện (Styling & I18n)
+- [x] Giai đoạn 13: Hoàn thiện (Styling & I18n)
 
 Dự án sẽ được xây dựng theo từng giai đoạn ("code lan"), đi từ Nền tảng (Core) -> Dữ liệu (Data) -> Trạng thái (ViewModel) -> Giao diện (View).
 
@@ -155,6 +155,6 @@ Dự án sẽ được xây dựng theo từng giai đoạn ("code lan"), đi t�
 ### Giai đoạn 13: Hoàn thiện (Styling & I18n)
 * **Mục tiêu:** Sao chép và rà soát lại các tài nguyên tĩnh.
 * **File:**
-    * `resources/com/example/embyapp/styles.css`
-    * `resources/com/example/embyapp/config.json`
+    * `resources/com/vinhtt/embyclientsolid/styles.css`
+    * `resources/com/vinhtt/embyclientsolid/config.json`
 * **Kiểm tra:** Ứng dụng có giao diện hoàn chỉnh và hỗ trợ đa ngôn ngữ (I18n) đầy đủ.

@@ -394,24 +394,6 @@ public class MainController {
                 notificationService.setOwnerWindow(scene.getWindow());
             }
 
-            scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-                // (UR-13) ENTER Hotkey to repeat last Add Tag
-                if (event.getCode() == KeyCode.ENTER && !event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown()) {
-
-                    Node focusedNode = scene.getFocusOwner();
-
-                    boolean isBlockingControl = focusedNode instanceof javafx.scene.control.TextInputControl ||
-                            focusedNode instanceof javafx.scene.control.Button ||
-                            focusedNode instanceof javafx.scene.control.ToggleButton;
-
-                    if (focusedNode == null || !isBlockingControl) {
-                        if (itemDetailViewModel != null) {
-                            itemDetailViewModel.repeatAddChipCommand();
-                            event.consume();
-                        }
-                    }
-                }
-            });
             // Di chuyển logic từ registerGlobalHotkeys() vào đây
             // để đảm bảo nó được gọi.
             if (appNavigator != null) {

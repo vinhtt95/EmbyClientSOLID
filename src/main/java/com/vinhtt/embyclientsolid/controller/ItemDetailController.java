@@ -600,4 +600,14 @@ public class ItemDetailController {
             viewModel.saveChangesCommand();
         }
     }
+    /**
+     * Xử lý hotkey CMD+ENTER từ AppNavigator (chỉ dùng cho pop-out).
+     * (UR-27, UR-39).
+     */
+    public void handlePlayHotkey() {
+        // Chỉ gọi command nếu item không phải là thư mục
+        if (viewModel != null && Boolean.FALSE.equals(viewModel.isFolderProperty().get())) {
+            viewModel.openFileOrFolderCommand();
+        }
+    }
 }
