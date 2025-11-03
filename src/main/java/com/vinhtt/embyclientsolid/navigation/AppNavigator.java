@@ -273,13 +273,6 @@ public class AppNavigator implements IAppNavigator {
         try {
             // Chỉ tạo dialog nếu nó chưa tồn tại
             if (detailDialog == null) {
-                // 1. Tạo VM MỚI cho pop-out
-                this.popOutDetailViewModel = new ItemDetailViewModel(
-                        itemRepository, itemUpdateService, staticDataRepository,
-                        externalDataService, localInteractionService, notificationService,
-                        sessionService, null, // Pop-out VM không cần tham chiếu đến TreeVM
-                        configService
-                );
 
                 // 2. Tải FXML
                 URL fxmlUrl = MainApp.class.getResource("view/fxml/ItemDetailView.fxml");
@@ -291,7 +284,11 @@ public class AppNavigator implements IAppNavigator {
                 Parent root = loader.load();
 
                 // 4. Tiêm VM vào Controller MỚI
-                controller.setViewModel(this.popOutDetailViewModel, configService);
+                if (this.mainDetailVM == null) {
+                    notificationService.showStatus("Lỗi: VM chi tiết chính chưa được khởi tạo.");
+                    return;
+                }
+                controller.setViewModel(this.mainDetailVM, configService);
 
                 // 5. Cấu hình Stage
                 detailDialog = new Stage();
@@ -316,22 +313,21 @@ public class AppNavigator implements IAppNavigator {
 
                 // 8. Đăng ký hotkeys cho scene MỚI này (UR-13)
                 // (Chỉ truyền vào các thành phần mà pop-out có)
-                registerHotkeysForScene(scene, null, controller, null, null);
-
-                final IItemDetailViewModel vm = this.popOutDetailViewModel;
+                final IItemDetailViewModel sharedVM = this.mainDetailVM;
                 final Stage stage = detailDialog;
 
-                vm.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
-                    if (newCtx != null) {
+                sharedVM.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
+                    // (MỚI) Chỉ kích hoạt nếu cửa sổ POP-UP (stage) đang focus
+                    if (newCtx != null && stage.isFocused()) {
                         // Gọi hàm showAddTagDialog của chính AppNavigator
                         AddTagResult result = showAddTagDialog(stage, newCtx);
 
-                        // (Sửa lỗi focus: Trả focus về stage pop-up)
+                        // (SỬA LỖI FOCUS: Yêu cầu focus vào Nút gốc (root node) của Scene)
                         Platform.runLater(root::requestFocus);
 
                         // Gửi kết quả (hoặc null) trở lại ViewModel
-                        vm.processAddTagResult(result, newCtx);
-                        vm.clearAddChipCommand();
+                        sharedVM.processAddTagResult(result, newCtx);
+                        sharedVM.clearAddChipCommand();
                     }
                 });
 
@@ -343,12 +339,9 @@ public class AppNavigator implements IAppNavigator {
                     preferenceService.putDouble(KEY_DIALOG_Y, detailDialog.getY());
                     preferenceService.flush();
                     detailDialog = null; // Hủy stage
-                    popOutDetailViewModel = null; // Hủy VM
                 });
             }
 
-            // 10. Tải item (hoặc tải lại) và hiển thị
-            this.popOutDetailViewModel.loadItem(item);
             detailDialog.show();
             detailDialog.toFront();
 
@@ -400,12 +393,12 @@ public class AppNavigator implements IAppNavigator {
                                          MainController mainController,
                                          ItemDetailController detailController,
                                          ItemGridController gridController,
-                                         IItemGridViewModel gridViewModel)
+                                         IItemGridViewModel gridViewModel) // gridViewModel dùng cho Mouse Nav
     {
         if (scene == null) return;
 
         // --- ENTER (Repeat Add Tag) ---
-        // (Sẽ dùng Cột 3 (chính) hoặc Cột 3 (pop-up) tùy theo focus)
+        // Luôn gọi mainDetailVM (vì nó được chia sẻ)
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ENTER && !event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown()) {
                 Node focusedNode = scene.getFocusOwner();
@@ -414,12 +407,7 @@ public class AppNavigator implements IAppNavigator {
                         focusedNode instanceof javafx.scene.control.ToggleButton;
 
                 if (focusedNode == null || !isBlockingControl) {
-                    if (detailController != null) {
-                        // Nếu scene này có detailController (scene chính HOẶC pop-up)
-                        detailController.handleRepeatAddTagHotkey();
-                        event.consume();
-                    } else if (this.mainDetailVM != null) {
-                        // Fallback: Nếu scene (ví dụ Grid) k có, gọi Cột 3 (chính)
+                    if (this.mainDetailVM != null) {
                         this.mainDetailVM.repeatAddChipCommand();
                         event.consume();
                     }
@@ -428,39 +416,30 @@ public class AppNavigator implements IAppNavigator {
         });
 
         // --- CMD+S (Save) ---
-        // (Sẽ dùng Cột 3 (chính) hoặc Cột 3 (pop-up) tùy theo focus)
+        // Luôn gọi mainDetailVM (vì nó được chia sẻ)
         final KeyCombination saveShortcut = new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN);
         scene.getAccelerators().put(saveShortcut, () -> {
-            if (detailController != null) {
-                // Lưu Cột 3 (chính) hoặc Cột 3 (pop-up)
-                detailController.handleSaveHotkey();
-            } else if (this.mainDetailVM != null) {
-                // Fallback: Lưu Cột 3 (chính)
-                this.mainDetailVM.saveChangesCommand();
-            }
-        });
-
-        // --- CMD+ENTER (Play) ---
-        // (Sẽ dùng Cột 2 (chính) hoặc Cột 3 (pop-up) tùy theo focus)
-        final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
-        scene.getAccelerators().put(playShortcut, () -> {
-            if (gridController != null) {
-                // Scene chính: Hotkey "Play" gọi Grid Controller (Cột 2)
-                gridController.playSelectedItem();
-            } else if (detailController != null) {
-                // Scene Pop-up: Hotkey "Play" gọi Detail Controller (Cột 3)
-                detailController.handlePlayHotkey();
-            } else if (this.mainGridVM != null) {
-                // Fallback: Gọi Cột 2 (chính)
-                BaseItemDto selectedItem = this.mainGridVM.selectedItemProperty().get();
-                if (selectedItem != null) {
-                    this.mainGridVM.playItemCommand(selectedItem);
+            if (this.mainDetailVM != null) {
+                // Kiểm tra isDirty() trước khi lưu
+                if (this.mainDetailVM.isDirtyProperty().get()) {
+                    this.mainDetailVM.saveChangesCommand();
                 }
             }
         });
 
+        // --- CMD+ENTER (Play) ---
+        // Phím này CẦN biết ngữ cảnh (Context-Aware)
+        final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
+        if (gridController != null) {
+            // Scene chính: Hotkey "Play" gọi Grid Controller (Cột 2)
+            scene.getAccelerators().put(playShortcut, gridController::playSelectedItem);
+        } else if (detailController != null) {
+            // Scene Pop-up: Hotkey "Play" gọi Detail Controller (Cột 3)
+            scene.getAccelerators().put(playShortcut, detailController::handlePlayHotkey);
+        }
 
-        // --- Phím tắt CỘT 2 (Grid) (Luôn gọi 'mainGridVM') ---
+        // --- Phím tắt CỘT 2 (Grid) ---
+        // Luôn gọi mainGridVM (Toàn cục)
         if (this.mainGridVM != null) {
             // CMD+N (Next)
             final KeyCombination nextShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN);
@@ -470,11 +449,11 @@ public class AppNavigator implements IAppNavigator {
             final KeyCombination prevShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(prevShortcut, this.mainGridVM::selectPreviousItem);
 
-            // (MỚI) CMD+SHIFT+N (Next and Play)
+            // CMD+SHIFT+N (Next and Play)
             final KeyCombination nextAndPlayShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
             scene.getAccelerators().put(nextAndPlayShortcut, this.mainGridVM::selectAndPlayNextItem);
 
-            // (MỚI) CMD+SHIFT+P (Previous and Play)
+            // CMD+SHIFT+P (Previous and Play)
             final KeyCombination prevAndPlayShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
             scene.getAccelerators().put(prevAndPlayShortcut, this.mainGridVM::selectAndPlayPreviousItem);
 
@@ -499,6 +478,7 @@ public class AppNavigator implements IAppNavigator {
             });
         }
     }
+
 
     /**
      * Helper nội bộ để tải FXML, tiêm Controller, và hiển thị Scene.

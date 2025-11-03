@@ -274,9 +274,9 @@ public class MainController {
 
         // 6. Chi tiết (Add Chip) -> MainController -> AppNavigator
         itemDetailViewModel.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
-            if (newCtx != null) {
-                Stage ownerStage = (Stage) rootPane.getScene().getWindow();
+            Stage ownerStage = (Stage) rootPane.getScene().getWindow();
 
+            if (newCtx != null && ownerStage.isFocused()) {
                 // Gọi AppNavigator để hiển thị dialog (blocking)
                 AddTagResult result = appNavigator.showAddTagDialog(ownerStage, newCtx);
 
