@@ -130,7 +130,10 @@ public class ItemGridController {
             // (UR-24: Cuộn xuống)
             if (newVal.doubleValue() > 0.95 && oldVal.doubleValue() < 0.95) {
                 if (viewModel.hasNextPageProperty().get()) {
-                    if (showConfirmationDialog("Chuyển Trang", "Bạn có muốn chuyển sang trang tiếp theo?")) {
+                    if (showConfirmationDialog(
+                            configService.getString("itemGridView", "confirmDialogTitle"),
+                            configService.getString("itemGridView", "confirmNextPage")
+                    )) {
                         viewModel.loadNextPage();
                     }
                 }
@@ -138,7 +141,10 @@ public class ItemGridController {
             // (UR-24: Cuộn lên)
             else if (newVal.doubleValue() < 0.05 && oldVal.doubleValue() > 0.05) {
                 if (viewModel.hasPreviousPageProperty().get()) {
-                    if (showConfirmationDialog("Chuyển Trang", "Bạn có muốn chuyển về trang trước đó?")) {
+                    if (showConfirmationDialog(
+                            configService.getString("itemGridView", "confirmDialogTitle"),
+                            configService.getString("itemGridView", "confirmPrevPage")
+                    )) {
                         viewModel.loadPreviousPage();
                     }
                 }
@@ -292,7 +298,8 @@ public class ItemGridController {
             }
         }
         // Fallback (ảnh placeholder) nếu ViewModel bị null hoặc không trả về URL
-        return "https://placehold.co/" + (int)CELL_WIDTH + "x" + (int)IMAGE_HEIGHT + "/333/999?text=" + (item.getType() != null ? item.getType() : "Item");
+        String placeholderText = (item.getType() != null ? item.getType() : configService.getString("itemGridView", "placeholderItem"));
+        return "https://placehold.co/" + (int)CELL_WIDTH + "x" + (int)IMAGE_HEIGHT + "/333/999?text=" + placeholderText;
     }
 
     /**

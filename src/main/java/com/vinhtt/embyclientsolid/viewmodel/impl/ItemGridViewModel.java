@@ -290,7 +290,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
         loading.set(true);
         showStatusMessage.set(true); // Hiển thị status (của Cột 2)
         // --- SỬA LỖI 2: Gọi global status ---
-        notificationService.showStatus("Đang tải items...");
+        notificationService.showStatus(configService.getString("mainView", "statusLoadingItems"));
 
         new Thread(() -> {
             try {
@@ -324,7 +324,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
         loading.set(true);
         showStatusMessage.set(true);
         // --- SỬA LỖI 2: Gọi global status ---
-        notificationService.showStatus("Đang tìm kiếm...");
+        notificationService.showStatus(configService.getString("itemGridView", "statusSearchPageLoading", (pageIndex + 1), "..."));
 
         new Thread(() -> {
             try {
@@ -356,7 +356,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
     private void loadItemsByChipInternal(int pageIndex, Tag chip, String chipType, String itemIdToSelect) {
         loading.set(true);
         showStatusMessage.set(true);
-        notificationService.showStatus("Đang tải theo chip...");
+        notificationService.showStatus("Đang tải theo chip...");notificationService.showStatus(configService.getString("itemGridView", "statusLoadingChip"));
 
         new Thread(() -> {
             try {
@@ -410,14 +410,18 @@ public class ItemGridViewModel implements IItemGridViewModel {
 
         if (pageItems.isEmpty()) {
             if (totalCount > 0) {
-                statusMessage.set("Trang này rỗng.");
+                statusMessage.set(configService.getString("itemGridView", "statusPageEmpty"));
             } else {
-                statusMessage.set("Không tìm thấy item nào.");
+                if (currentStateType == GridNavigationState.StateType.SEARCH) {
+                    statusMessage.set(configService.getString("itemGridView", "statusSearchEmpty", currentPrimaryParam));
+                } else {
+                    statusMessage.set(configService.getString("itemGridView", "statusLibraryEmpty"));
+                }
             }
             showStatusMessage.set(true);
         } else {
             // Cập nhật status Cục bộ (của Cột 2)
-            statusMessage.set(String.format("Đang hiển thị: %d/%d (%d items)", (pageIndex + 1), totalPages, totalCount));
+            statusMessage.set(configService.getString("itemGridView", "statusDisplaying", (pageIndex + 1), totalPages, totalCount));
             showStatusMessage.set(false); // Ẩn status Cục bộ, hiện grid
         }
 
@@ -461,7 +465,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
         Platform.runLater(() -> {
             loading.set(false);
             // --- SỬA LỖI 2: Cập nhật cả 2 status ---
-            String errorMessage = "Lỗi tải items: " + e.getMessage();
+            String errorMessage = configService.getString("itemGridView", "errorLoadingPageGeneric") + ": " + e.getMessage();
             statusMessage.set(errorMessage); // Status Cục bộ
             notificationService.showStatus(errorMessage); // Status Toàn cục
             showStatusMessage.set(true);
@@ -473,18 +477,18 @@ public class ItemGridViewModel implements IItemGridViewModel {
     public void playItemCommand(BaseItemDto item) {
         if (item == null) return;
 
-        notificationService.showStatus("Đang lấy đường dẫn để phát...");
+        notificationService.showStatus(configService.getString("itemGridController", "statusGetPath"));
 
         new Thread(() -> {
             try {
                 // (UR-27) Cần lấy DTO đầy đủ để có 'Path'
                 BaseItemDto fullDetails = itemRepository.getFullItemDetails(item.getId());
                 if (fullDetails.isIsFolder() != null && fullDetails.isIsFolder()) {
-                    throw new IOException("Không thể phát thư mục.");
+                    throw new IOException(configService.getString("itemGridController", "errorFolderDoubleClick"));
                 }
                 String path = fullDetails.getPath();
                 if (path == null || path.isEmpty()) {
-                    throw new FileNotFoundException("Không tìm thấy đường dẫn file media.");
+                    throw new FileNotFoundException(configService.getString("itemGridController", "errorNoPath"));
                 }
 
                 localInteractionService.openFileOrFolder(path);
@@ -492,7 +496,7 @@ public class ItemGridViewModel implements IItemGridViewModel {
 
             } catch (Exception e) {
                 System.err.println("Lỗi khi Phát từ Grid: " + e.getMessage());
-                Platform.runLater(() -> notificationService.showStatus("Lỗi phát file: " + e.getMessage()));
+                Platform.runLater(() -> notificationService.showStatus(configService.getString("itemGridController", "errorPlayFile", e.getMessage())));
             }
         }).start();
     }

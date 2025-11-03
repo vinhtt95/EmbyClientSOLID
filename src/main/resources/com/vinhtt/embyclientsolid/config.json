@@ -48,7 +48,9 @@
     "errorLoadingSearchGeneric": "Lỗi không xác định khi tìm kiếm.",
     "confirmDialogTitle": "Chuyển Trang",
     "confirmNextPage": "Bạn có muốn chuyển sang trang tiếp theo ({0}/{1})?",
-    "confirmPrevPage": "Bạn có muốn chuyển về trang trước đó ({0}/{1})?"
+    "confirmPrevPage": "Bạn có muốn chuyển về trang trước đó ({0}/{1})?",
+    "placeholderItem": "Item",
+    "statusLoadingChip": "Đang tải theo chip..."
   },
   "itemDetailView": {
     "popOutTitle": "Chi tiết Item (Pop-out)",
@@ -109,7 +111,8 @@
     "cloneErrorNoSource": "Lỗi: Không có item nguồn (cột chi tiết) để sao chép.",
     "cloneErrorNoChildren": "Item cha không có item con nào để nhân bản.",
     "errorScreenshotPathBase": "Lỗi: 'screenshotBasePath' chưa được cấu hình trong appSettings (config.json).",
-    "errorScreenshotPathOpen": "Lỗi khi mở thư mục screenshot: {0}"
+    "errorScreenshotPathOpen": "Lỗi khi mở thư mục screenshot: {0}",
+    "defaultExportName": "item"
   },
   "addTagDialog": {
     "addTagTitle": "Thêm Tag Mới",
@@ -145,7 +148,9 @@
     "copyStatusLoading": "Đang lấy thông tin từ ID: {0}...",
     "copySuccessStatus": "Đã sao chép và thêm mới {0} thuộc tính từ ID: {1}.",
     "copyErrorNotFound": "Không tìm thấy Item.",
-    "copyErrorStatus": "Lỗi sao chép từ ID: {0} - {1}"
+    "copyErrorStatus": "Lỗi sao chép từ ID: {0} - {1}",
+    "copyStatusAccepted": "Đã chấp nhận ID.",
+    "copyErrorIdRequired": "Vui lòng nhập ID."
   },
   "loginViewModel": {
     "errorEmptyFields": "Please enter Server URL, Username, and Password.",
@@ -226,5 +231,19 @@
   },
   "contextMenu": {
     "copyId": "Sao chép ID"
+  },
+  "exceptions": {
+    "notLoggedIn": "Chưa đăng nhập.",
+    "unsupportedImageFormat": "Không hỗ trợ định dạng file ảnh: {0}",
+    "uploadFailed": "Upload thất bại (Code {0}): {1}",
+    "emptyTag": "Trống",
+    "fxmlNotFound": "Không tìm thấy FXML: {0}",
+    "dialogError": "Lỗi: Không thể mở dialog. {0}",
+    "vmNotInitialized": "Lỗi: VM chi tiết chính chưa được khởi tạo.",
+    "popupError": "Lỗi mở pop-out: {0}",
+    "parentFolderNotFound": "Không thể tìm thấy thư mục cha cho: {0}",
+    "mediaFileNameEmpty": "Tên file media rỗng.",
+    "mediaPathInvalid": "Đường dẫn media không hợp lệ (không có phần mở rộng): {0}",
+    "invalidServerResponse": "Phản hồi không hợp lệ từ máy chủ."
   }
 }

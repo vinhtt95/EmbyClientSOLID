@@ -1,5 +1,6 @@
 package com.vinhtt.embyclientsolid.data.impl;
 
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import com.vinhtt.embyclientsolid.core.IEmbySessionService;
 import com.vinhtt.embyclientsolid.data.IItemRepository;
 import com.vinhtt.embyclientsolid.model.Tag;
@@ -26,15 +27,17 @@ public class EmbyItemRepository implements IItemRepository {
 
     private final IEmbySessionService sessionService;
     private final ApiClient apiClient;
+    private final IConfigurationService configService;
 
     /**
      * Khởi tạo Repository với Session Service.
      *
      * @param sessionService Service đã được tiêm (DI).
      */
-    public EmbyItemRepository(IEmbySessionService sessionService) {
+    public EmbyItemRepository(IEmbySessionService sessionService, IConfigurationService configService) {
         this.sessionService = sessionService;
         this.apiClient = sessionService.getApiClient();
+        this.configService = configService;
     }
 
     // --- Helpers để lấy API services ---
@@ -631,7 +634,7 @@ public class EmbyItemRepository implements IItemRepository {
     public BaseItemDto getFullItemDetails(String itemId) throws ApiException {
         String userId = sessionService.getCurrentUserId();
         if (userId == null) {
-            throw new IllegalStateException("Chưa đăng nhập. Không thể lấy chi tiết item.");
+            throw new IllegalStateException(configService.getString("exceptions", "notLoggedIn"));
         }
         // Logic từ ItemRepository.getFullItemDetails
         return getUserLibraryServiceApi().getUsersByUseridItemsById(userId, itemId);

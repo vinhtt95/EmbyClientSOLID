@@ -70,7 +70,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
     // --- Properties (Trạng thái UI) ---
     private final ReadOnlyBooleanWrapper loading = new ReadOnlyBooleanWrapper(false);
-    private final ReadOnlyStringWrapper statusMessage = new ReadOnlyStringWrapper("Vui lòng chọn một item...");
+    private ReadOnlyStringWrapper statusMessage = new ReadOnlyStringWrapper("Vui lòng chọn một item...");
     private final ReadOnlyBooleanWrapper showStatusMessage = new ReadOnlyBooleanWrapper(true);
 
     private final StringProperty title = new SimpleStringProperty("");
@@ -111,7 +111,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         this.sessionService = sessionService;
         this.libraryTreeViewModel = libraryTreeViewModel;
         this.configService = configService;
-
+        this.statusMessage = new ReadOnlyStringWrapper(configService.getString("itemDetailView", "statusDefault"));
         this.dirtyTracker = new ItemDetailDirtyTracker(this);
         this.importHandler = new ItemDetailImportHandler(this, this.dirtyTracker);
         this.jsonFileHandler = new JsonFileHandler(configService);
@@ -919,7 +919,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
             name = title.get();
         }
         if (name == null || name.trim().isEmpty()) {
-            return "item";
+            return configService.getString("itemDetailView", "defaultExportName");
         }
         return name;
     }

@@ -486,21 +486,22 @@ public class AddTagViewModel implements IAddTagViewModel {
     public void copyCommand() {
         String id = copyId.get();
         if (id != null && !id.trim().isEmpty()) {
-            copyStatus.set("Đang kiểm tra ID...");
+            copyStatus.set(configService.getString("addTagDialog", "copyStatusLoading", id.trim()));
             new Thread(() -> {
                 try {
                     // (Tạm thời bỏ qua kiểm tra, chỉ cần ID)
                     Platform.runLater(() -> {
-                        copyStatus.set("Đã chấp nhận ID.");
+                        copyStatus.set(configService.getString("addTagDialog", "copyStatusAccepted"));
+
                         this.result = new AddTagResult(id.trim());
                         closeDialog.set(true);
                     });
                 } catch (Exception e) {
-                    Platform.runLater(() -> copyStatus.set("Lỗi: Không tìm thấy ID."));
+                    Platform.runLater(() -> copyStatus.set(configService.getString("addTagDialog", "copyErrorNotFound")));
                 }
             }).start();
         } else {
-            copyStatus.set("Vui lòng nhập ID.");
+            copyStatus.set(configService.getString("addTagDialog", "copyErrorIdRequired")); // Key mới
         }
     }
 

@@ -48,13 +48,13 @@ public class MainApp extends Application {
         // 1. Khởi tạo các Service Cốt lõi (Giai đoạn 2 & 4)
         this.preferenceService = new JavaPreferenceService();
         IConfigurationService configService = new JsonConfigurationService();
-        this.sessionService = new EmbySessionService(preferenceService);
+        this.sessionService = new EmbySessionService(preferenceService, configService);
         ILocalInteractionService localInteractionService = new DesktopInteractionService(configService);
         INotificationService notificationService = new NotificationService(configService);
 
         // 2. Khởi tạo các Repository (Giai đoạn 3)
         // (Lưu ý: Các repo cần sessionService)
-        IItemRepository itemRepository = new EmbyItemRepository(sessionService);
+        IItemRepository itemRepository = new EmbyItemRepository(sessionService, configService);
         IStaticDataRepository staticDataRepository = new EmbyStaticDataRepository(sessionService);
         IExternalDataService externalDataService = new ExternalMovieDataService();
         // (Lưu ý: EmbyItemUpdateService cần IItemRepository để đọc DTOs khi clone)

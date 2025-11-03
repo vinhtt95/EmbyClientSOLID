@@ -4,6 +4,7 @@ import com.squareup.okhttp.Interceptor;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import com.vinhtt.embyclientsolid.core.IEmbySessionService;
 import com.vinhtt.embyclientsolid.core.IPreferenceService;
 import embyclient.ApiClient;
@@ -40,6 +41,7 @@ public class EmbySessionService implements IEmbySessionService {
 
     private final IPreferenceService preferenceService;
     private final ApiClient apiClient;
+    private final IConfigurationService configService;
 
     private AuthenticationAuthenticationResult currentAuthResult;
     private String currentAccessToken;
@@ -50,8 +52,9 @@ public class EmbySessionService implements IEmbySessionService {
      *
      * @param preferenceService Service đã được tiêm (DI) để quản lý lưu trữ.
      */
-    public EmbySessionService(IPreferenceService preferenceService) {
+    public EmbySessionService(IPreferenceService preferenceService, IConfigurationService configService) {
         this.preferenceService = preferenceService;
+        this.configService = configService;
 
         this.apiClient = new ApiClient();
         // Cấu hình OkHttpClient với Interceptor
@@ -112,7 +115,7 @@ public class EmbySessionService implements IEmbySessionService {
         if (authResult != null && authResult.getAccessToken() != null) {
             setCurrentAuthResult(authResult, url, clientAuthHeader);
         } else {
-            throw new ApiException("Phản hồi không hợp lệ từ máy chủ.");
+            throw new ApiException(configService.getString("exceptions", "invalidServerResponse"));
         }
     }
 
@@ -232,7 +235,7 @@ public class EmbySessionService implements IEmbySessionService {
     private String generateClientAuthHeader() {
         String appName = "EmbyClientSOLID"; // Tên app mới
         String appVersion = "1.0.0";
-        String deviceName = System.getProperty("os.name", "Desktop");
+        String deviceName = System.getProperty("os.name", configService.getString("appSettings", "defaultDeviceName"));
 
         // Lấy hoặc tạo DeviceId
         String deviceId = preferenceService.getString(KEY_DEVICE_ID, null);
