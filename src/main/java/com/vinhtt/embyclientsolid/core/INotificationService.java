@@ -1,6 +1,7 @@
 package com.vinhtt.embyclientsolid.core;
 
 import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.stage.Window;
 
 /**
  * Interface trừu tượng hóa hệ thống thông báo trạng thái và xác nhận.
@@ -38,4 +39,6 @@ public interface INotificationService {
      * @return true nếu người dùng chọn Yes, false nếu chọn No/Cancel.
      */
     boolean showConfirmation(String title, String content);
+
+    void setOwnerWindow(Window window);
 }

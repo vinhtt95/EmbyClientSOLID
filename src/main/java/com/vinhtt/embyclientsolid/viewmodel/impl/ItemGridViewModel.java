@@ -7,6 +7,7 @@ import com.vinhtt.embyclientsolid.data.IItemRepository;
 import com.vinhtt.embyclientsolid.model.GridNavigationState;
 import com.vinhtt.embyclientsolid.model.Tag;
 import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import embyclient.ApiException;
 import embyclient.model.BaseItemDto;
 import embyclient.model.QueryResultBaseItemDto;
@@ -39,7 +40,8 @@ public class ItemGridViewModel implements IItemGridViewModel {
     private final IItemRepository itemRepository;
     private final INotificationService notificationService;
     private final ILocalInteractionService localInteractionService; // (Cho UR-27)
-    private final IEmbySessionService sessionService; // <-- SỬA LỖI 1: Thêm service
+    private final IEmbySessionService sessionService;
+    private final IConfigurationService configService;
 
     // --- Trạng thái nội bộ ---
     private int totalCount = 0;
@@ -84,16 +86,18 @@ public class ItemGridViewModel implements IItemGridViewModel {
             IItemRepository itemRepository,
             INotificationService notificationService,
             ILocalInteractionService localInteractionService,
-            IEmbySessionService sessionService // <-- SỬA LỖI 1: Thêm tham số
+            IEmbySessionService sessionService,
+            IConfigurationService configService
     ) {
         this.itemRepository = itemRepository;
         this.notificationService = notificationService;
         this.localInteractionService = localInteractionService;
-        this.sessionService = sessionService; // <-- SỬA LỖI 1: Lưu service
+        this.sessionService = sessionService;
+        this.configService = configService;
 
         // --- SỬA LỖI 2: Xóa listener tại đây ---
         // Không lắng nghe global status, chỉ đặt status của riêng Grid
-        this.statusMessage.set("Vui lòng chọn thư viện...");
+        this.statusMessage.set(configService.getString("itemGridView", "statusDefault"));
     }
 
     /**

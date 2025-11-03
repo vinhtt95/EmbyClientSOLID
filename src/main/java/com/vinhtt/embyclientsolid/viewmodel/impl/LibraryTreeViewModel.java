@@ -4,6 +4,7 @@ import com.vinhtt.embyclientsolid.core.INotificationService;
 import com.vinhtt.embyclientsolid.data.IItemRepository;
 import com.vinhtt.embyclientsolid.model.LibraryTreeItem;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import embyclient.ApiException;
 import embyclient.model.BaseItemDto;
 import javafx.application.Platform;
@@ -24,22 +25,26 @@ public class LibraryTreeViewModel implements ILibraryTreeViewModel {
 
     private final IItemRepository itemRepository;
     private final INotificationService notificationService;
+    private final IConfigurationService configService;
 
     private final ReadOnlyBooleanWrapper loading = new ReadOnlyBooleanWrapper(false);
     private final ReadOnlyObjectWrapper<TreeItem<LibraryTreeItem>> rootItem = new ReadOnlyObjectWrapper<>();
     private final ObjectProperty<TreeItem<LibraryTreeItem>> selectedTreeItem = new SimpleObjectProperty<>();
 
     // "Loading..." node (dummy node)
-    private static final TreeItem<LibraryTreeItem> DUMMY_NODE = new TreeItem<>(new LibraryTreeItem("Đang tải..."));
+    private final TreeItem<LibraryTreeItem> DUMMY_NODE;
 
     /**
      * Khởi tạo ViewModel.
      * @param itemRepository      Repo Đọc Item (DI).
      * @param notificationService Service Thông báo (DI).
      */
-    public LibraryTreeViewModel(IItemRepository itemRepository, INotificationService notificationService) {
+    public LibraryTreeViewModel(IItemRepository itemRepository, INotificationService notificationService, IConfigurationService configService) {
         this.itemRepository = itemRepository;
         this.notificationService = notificationService;
+        this.configService = configService;
+
+        this.DUMMY_NODE = new TreeItem<>(new LibraryTreeItem(configService.getString("mainView", "statusLoadingLibrary")));
 
         // Tạo root ảo (không hiển thị)
         TreeItem<LibraryTreeItem> root = new TreeItem<>();

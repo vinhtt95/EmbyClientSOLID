@@ -2,6 +2,7 @@ package com.vinhtt.embyclientsolid.controller;
 
 import com.vinhtt.embyclientsolid.model.LibraryTreeItem;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.fxml.FXML;
@@ -26,6 +27,7 @@ public class LibraryTreeController {
     @FXML private ProgressIndicator progressIndicator;
 
     private ILibraryTreeViewModel viewModel;
+    private IConfigurationService configService;
 
     /**
      * Khởi tạo Controller.
@@ -47,8 +49,9 @@ public class LibraryTreeController {
      *
      * @param viewModel ViewModel đã được khởi tạo.
      */
-    public void setViewModel(ILibraryTreeViewModel viewModel) {
+    public void setViewModel(ILibraryTreeViewModel viewModel, IConfigurationService configService) {
         this.viewModel = viewModel;
+        this.configService = configService;
 
         // 1. Binding UI
         progressIndicator.visibleProperty().bind(viewModel.loadingProperty());
@@ -101,9 +104,10 @@ public class LibraryTreeController {
     private class LibraryTreeCell extends TreeCell<LibraryTreeItem> {
 
         private final ContextMenu contextMenu = new ContextMenu();
-        private final MenuItem copyIdItem = new MenuItem("Sao chép ID"); // (UR-18)
+        private final MenuItem copyIdItem;
 
         public LibraryTreeCell() {
+            copyIdItem = new MenuItem(configService.getString("contextMenu", "copyId"));
             // (UR-18)
             copyIdItem.setOnAction(e -> {
                 if (getItem() != null && !getItem().isLoadingNode()) {

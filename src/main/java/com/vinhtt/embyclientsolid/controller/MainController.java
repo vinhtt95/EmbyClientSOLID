@@ -127,7 +127,7 @@ public class MainController {
             // 1. LibraryTreeController
             libraryTreeController = new LibraryTreeController(); // <-- TẠO MỚI
             loadAndInjectFXML("LibraryTreeView.fxml", libraryTreeController, leftPaneContainer); // <-- TIÊM
-            libraryTreeController.setViewModel(libraryTreeViewModel); // <-- BIND
+            libraryTreeController.setViewModel(libraryTreeViewModel, configService);
 
             // 2. ItemGridController
             itemGridController = new ItemGridController(); // <-- TẠO MỚI
@@ -388,6 +388,10 @@ public class MainController {
             if (scene == null) {
                 System.err.println("Không thể lấy Scene để đăng ký hotkey!");
                 return;
+            }
+
+            if (notificationService != null) {
+                notificationService.setOwnerWindow(scene.getWindow());
             }
 
             scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {

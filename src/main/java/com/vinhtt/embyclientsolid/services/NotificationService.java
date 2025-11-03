@@ -7,6 +7,8 @@ import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
+import javafx.stage.Window;
+import javafx.scene.control.DialogPane;
 
 import java.util.Optional;
 
@@ -17,6 +19,7 @@ import java.util.Optional;
 public class NotificationService implements INotificationService {
 
     private final IConfigurationService configService;
+    private Window ownerWindow = null;
     private final String readyString;
 
     /**
@@ -32,6 +35,11 @@ public class NotificationService implements INotificationService {
         this.configService = configService;
         this.readyString = configService.getString("mainView", "statusReady");
         this.statusMessage.set(this.readyString);
+    }
+
+    @Override
+    public void setOwnerWindow(Window window) {
+        this.ownerWindow = window;
     }
 
     @Override
@@ -61,6 +69,12 @@ public class NotificationService implements INotificationService {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(content);
+
+        if (ownerWindow != null) {
+            DialogPane dialogPane = alert.getDialogPane();
+            dialogPane.getStylesheets().addAll(ownerWindow.getScene().getStylesheets());
+            alert.initOwner(ownerWindow);
+        }
 
         // (Lưu ý: CSS styling cho Alert sẽ cần được xử lý ở Giai đoạn 13
         // hoặc khi Stage/Scene chính được tạo)

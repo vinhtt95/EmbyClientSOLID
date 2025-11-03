@@ -7,6 +7,7 @@ import com.vinhtt.embyclientsolid.model.SuggestionItem;
 import com.vinhtt.embyclientsolid.model.Tag;
 import com.vinhtt.embyclientsolid.viewmodel.AddTagResult;
 import com.vinhtt.embyclientsolid.viewmodel.IAddTagViewModel;
+import com.vinhtt.embyclientsolid.core.IConfigurationService;
 import embyclient.model.BaseItemDto;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -40,7 +41,8 @@ public class AddTagViewModel implements IAddTagViewModel {
 
     // --- Services (DI) ---
     private final IStaticDataRepository staticDataRepository;
-    private final IItemRepository itemRepository; // Dùng cho Copy by ID
+    private final IItemRepository itemRepository;
+    private final IConfigurationService configService;
 
     // --- Trạng thái nội bộ ---
     private SuggestionContext currentContext = SuggestionContext.TAG;
@@ -52,9 +54,9 @@ public class AddTagViewModel implements IAddTagViewModel {
     private List<SuggestionItem> allSimpleSuggestions = new ArrayList<>();
 
     // --- Properties (Binding) ---
-    private final ReadOnlyStringWrapper title = new ReadOnlyStringWrapper("Thêm Tag");
-    private final ReadOnlyStringWrapper simpleLabel = new ReadOnlyStringWrapper("Tag Đơn giản");
-    private final ReadOnlyStringWrapper simpleSuggestionLabel = new ReadOnlyStringWrapper("Tag Đơn giản");
+    private final ReadOnlyStringWrapper title = new ReadOnlyStringWrapper();
+    private final ReadOnlyStringWrapper simpleLabel = new ReadOnlyStringWrapper();
+    private final ReadOnlyStringWrapper simpleSuggestionLabel = new ReadOnlyStringWrapper();
     private final BooleanProperty simpleMode = new SimpleBooleanProperty(false);
     private final StringProperty simpleName = new SimpleStringProperty("");
     private final StringProperty key = new SimpleStringProperty("");
@@ -73,9 +75,10 @@ public class AddTagViewModel implements IAddTagViewModel {
     private final ObservableList<Tag> suggestionValues = FXCollections.observableArrayList();
     private final ObservableList<SuggestionItem> suggestionSimple = FXCollections.observableArrayList();
 
-    public AddTagViewModel(IStaticDataRepository staticDataRepository, IItemRepository itemRepository) {
+    public AddTagViewModel(IStaticDataRepository staticDataRepository, IItemRepository itemRepository, IConfigurationService configService) {
         this.staticDataRepository = staticDataRepository;
         this.itemRepository = itemRepository;
+        this.configService = configService;
         setupListeners();
     }
 
@@ -123,25 +126,25 @@ public class AddTagViewModel implements IAddTagViewModel {
         // (Tạm thời hardcode, GĐ 13 sẽ dùng IConfigurationService)
         switch (context) {
             case STUDIO:
-                title.set("Thêm Studio Mới");
-                simpleLabel.set("Tên Studio");
-                simpleSuggestionLabel.set("Studios");
+                title.set(configService.getString("addTagDialog", "addStudioTitle"));
+                simpleLabel.set(configService.getString("addTagDialog", "labelSimpleStudio"));
+                simpleSuggestionLabel.set(configService.getString("addTagDialog", "suggestionSimpleStudioLabel"));
                 break;
             case PEOPLE:
-                title.set("Thêm Người Mới");
-                simpleLabel.set("Tên Người");
-                simpleSuggestionLabel.set("People");
+                title.set(configService.getString("addTagDialog", "addPeopleTitle"));
+                simpleLabel.set(configService.getString("addTagDialog", "labelSimplePeople"));
+                simpleSuggestionLabel.set(configService.getString("addTagDialog", "suggestionSimplePeopleLabel"));
                 break;
             case GENRE:
-                title.set("Thêm Thể Loại Mới");
-                simpleLabel.set("Tên Thể Loại");
-                simpleSuggestionLabel.set("Genres");
+                title.set(configService.getString("addTagDialog", "addGenreTitle"));
+                simpleLabel.set(configService.getString("addTagDialog", "labelSimpleGenre"));
+                simpleSuggestionLabel.set(configService.getString("addTagDialog", "suggestionSimpleGenreLabel"));
                 break;
             case TAG:
             default:
-                title.set("Thêm Tag Mới");
-                simpleLabel.set("Tag Đơn giản");
-                simpleSuggestionLabel.set("Tag Đơn giản");
+                title.set(configService.getString("addTagDialog", "addTagTitle"));
+                simpleLabel.set(configService.getString("addTagDialog", "labelSimple"));
+                simpleSuggestionLabel.set(configService.getString("addTagDialog", "suggestionSimpleLabel"));
                 break;
         }
     }

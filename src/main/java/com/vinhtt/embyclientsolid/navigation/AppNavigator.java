@@ -140,14 +140,16 @@ public class AppNavigator implements IAppNavigator {
             // 2. Tạo các ViewModel con
             ILibraryTreeViewModel libraryTreeViewModel = new LibraryTreeViewModel(
                     itemRepository,
-                    notificationService
+                    notificationService,
+                    configService
             );
 
             IItemGridViewModel itemGridViewModel = new ItemGridViewModel(
                     itemRepository,
                     notificationService,
                     localInteractionService,
-                    sessionService
+                    sessionService,
+                    configService
             );
 
             IItemDetailViewModel itemDetailViewModel = new ItemDetailViewModel(
@@ -194,7 +196,8 @@ public class AppNavigator implements IAppNavigator {
             // 1. Tạo ViewModel
             IAddTagViewModel viewModel = new AddTagViewModel(
                     staticDataRepository,
-                    itemRepository
+                    itemRepository,
+                    configService
             );
             viewModel.setContext(context);
 

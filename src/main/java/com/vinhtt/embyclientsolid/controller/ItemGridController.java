@@ -262,7 +262,7 @@ public class ItemGridController {
 
         // (UR-28: Copy ID)
         final ContextMenu contextMenu = new ContextMenu();
-        final MenuItem copyIdItem = new MenuItem("Sao chép ID");
+        final MenuItem copyIdItem = new MenuItem(configService.getString("contextMenu", "copyId"));
         copyIdItem.setOnAction(e -> {
             if (item.getId() != null) {
                 final Clipboard clipboard = Clipboard.getSystemClipboard();
