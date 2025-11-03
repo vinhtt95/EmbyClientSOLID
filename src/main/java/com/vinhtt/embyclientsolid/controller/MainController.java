@@ -83,6 +83,8 @@ public class MainController {
     private static final String KEY_DIVIDER_1 = "dividerPos1";
     private static final String KEY_DIVIDER_2 = "dividerPos2";
 
+    // Biến lưu vị trí divider trước khi ẩn cột 3
+    private double[] lastDividerPositions = new double[]{0.20, 0.60}; // Giá trị mặc định
     /**
      * Khởi tạo MainController với tất cả các dependencies (DI).
      *
@@ -338,8 +340,8 @@ public class MainController {
             if (newV != null && newV) {
                 BaseItemDto selectedItem = itemGridViewModel.selectedItemProperty().get();
                 if (selectedItem != null) {
-                    // Yêu cầu AppNavigator mở cửa sổ pop-out
-                    appNavigator.showPopOutDetail(selectedItem);
+                    // Yêu cầu AppNavigator mở cửa sổ pop-out VÀ TRUYỀN 'THIS'
+                    appNavigator.showPopOutDetail(selectedItem, this);
                 }
                 itemDetailViewModel.clearPopOutRequest(); // Reset cờ
             }
@@ -492,6 +494,9 @@ public class MainController {
             double pos1 = preferenceService.getDouble(KEY_DIVIDER_1, 0.20); // Mặc định 20%
             double pos2 = preferenceService.getDouble(KEY_DIVIDER_2, 0.60); // Mặc định 60%
 
+            // Lưu vị trí khôi phục vào biến instance
+            lastDividerPositions = new double[]{pos1, pos2};
+
             Platform.runLater(() -> {
                 // Đặt vị trí
                 mainSplitPane.setDividerPositions(pos1, pos2);
@@ -499,6 +504,44 @@ public class MainController {
                 // Thêm listener để tự động lưu khi người dùng kéo
                 mainSplitPane.getDividers().get(0).positionProperty().addListener((obs, o, n) -> saveDividerPositions());
                 mainSplitPane.getDividers().get(1).positionProperty().addListener((obs, o, n) -> saveDividerPositions());
+            });
+        }
+    }
+
+    /**
+     * Ẩn cột chi tiết (cột 3) và cho phép cột 2 (grid) mở rộng.
+     * Được gọi bởi AppNavigator khi mở pop-out.
+     */
+    public void hideDetailColumn() {
+        if (rightPaneContainer != null && mainSplitPane.getItems().contains(rightPaneContainer)) {
+            // 1. Lưu vị trí divider hiện tại (nếu có 2 dividers)
+            if (mainSplitPane.getDividerPositions().length >= 2) {
+                lastDividerPositions = mainSplitPane.getDividerPositions();
+            }
+
+            // 2. Ẩn và xóa cột 3 khỏi SplitPane
+            // Điều này sẽ khiến cột 2 tự động mở rộng
+            rightPaneContainer.setVisible(false);
+            rightPaneContainer.setManaged(false);
+            mainSplitPane.getItems().remove(rightPaneContainer);
+        }
+    }
+
+    /**
+     * Hiện lại cột chi tiết (cột 3) và khôi phục vị trí divider.
+     * Được gọi bởi AppNavigator khi đóng pop-out.
+     */
+    public void showDetailColumn() {
+        if (rightPaneContainer != null && !mainSplitPane.getItems().contains(rightPaneContainer)) {
+            // 1. Thêm cột 3 trở lại SplitPane
+            rightPaneContainer.setVisible(true);
+            rightPaneContainer.setManaged(true);
+            mainSplitPane.getItems().add(rightPaneContainer);
+
+            // 2. Khôi phục vị trí divider
+            // Phải bọc trong Platform.runLater để đảm bảo layout đã cập nhật
+            Platform.runLater(() -> {
+                mainSplitPane.setDividerPositions(lastDividerPositions[0], lastDividerPositions[1]);
             });
         }
     }

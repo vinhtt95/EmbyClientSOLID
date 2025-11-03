@@ -77,6 +77,7 @@ public class AppNavigator implements IAppNavigator {
     private IItemDetailViewModel popOutDetailViewModel;
     private IItemGridViewModel mainGridVM;
     private IItemDetailViewModel mainDetailVM;
+    private MainController mainControllerRef;
 
     // Các hằng số để lưu vị trí/kích thước cửa sổ pop-out
     private static final String KEY_DIALOG_WIDTH = "popOutDialogWidth";
@@ -267,10 +268,15 @@ public class AppNavigator implements IAppNavigator {
     }
 
     @Override
-    public void showPopOutDetail(BaseItemDto item) {
+    public void showPopOutDetail(BaseItemDto item, Object mainController) {
         if (item == null) return;
 
         try {
+            // Lưu tham chiếu đến MainController
+            if (mainController instanceof MainController) {
+                this.mainControllerRef = (MainController) mainController;
+            }
+
             // Chỉ tạo dialog nếu nó chưa tồn tại
             if (detailDialog == null) {
 
@@ -293,6 +299,11 @@ public class AppNavigator implements IAppNavigator {
                 // 5. Cấu hình Stage
                 detailDialog = new Stage();
                 detailDialog.setTitle(configService.getString("itemDetailView", "popOutTitle"));
+
+                // Đặt Owner cho dialog
+                // Điều này tự động đóng dialog khi cửa sổ chính (primaryStage) đóng.
+                detailDialog.initOwner(primaryStage);
+                detailDialog.initModality(Modality.NONE);
 
                 // 6. Lấy kích thước/vị trí đã lưu (UR-50)
                 double defaultWidth = 1000, defaultHeight = 800;
@@ -341,6 +352,11 @@ public class AppNavigator implements IAppNavigator {
 
                 // 9. Lưu kích thước khi đóng (UR-50)
                 detailDialog.setOnCloseRequest(e -> {
+                    // YÊU CẦU 1: Hiện lại cột detail khi đóng dialog
+                    if (this.mainControllerRef != null) {
+                        this.mainControllerRef.showDetailColumn();
+                        this.mainControllerRef = null; // Xóa tham chiếu
+                    }
                     preferenceService.putDouble(KEY_DIALOG_WIDTH, detailDialog.getWidth());
                     preferenceService.putDouble(KEY_DIALOG_HEIGHT, detailDialog.getHeight());
                     preferenceService.putDouble(KEY_DIALOG_X, detailDialog.getX());
@@ -348,6 +364,12 @@ public class AppNavigator implements IAppNavigator {
                     preferenceService.flush();
                     detailDialog = null; // Hủy stage
                 });
+            }
+
+            // Hiện lại cột detail khi đóng dialog
+            if (this.mainControllerRef != null) {
+                this.mainControllerRef.showDetailColumn();
+                this.mainControllerRef = null; // Xóa tham chiếu
             }
 
             detailDialog.show();

@@ -52,8 +52,9 @@ public interface IAppNavigator {
      * Hiển thị cửa sổ chi tiết (Cột 3) dưới dạng "pop-out" (cửa sổ riêng).
      *
      * @param item Item để hiển thị trong cửa sổ pop-out.
+     * @param mainController Tham chiếu đến MainController để gọi ẩn/hiện cột 3.
      */
-    void showPopOutDetail(BaseItemDto item);
+    void showPopOutDetail(BaseItemDto item, Object mainController);
 
     /**
      * Đăng ký các phím tắt (hotkeys) và sự kiện điều hướng (chuột)
