@@ -848,6 +848,12 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         int lastDot = fileName.lastIndexOf('.');
         String baseName = (lastDot == -1) ? fileName : fileName.substring(0, lastDot);
 
+        // Loại bỏ domain trước dấu @
+        String[] parts = baseName.split("@", 2);
+        if (parts.length > 1) {
+            baseName = parts[1];
+        }
+
         baseName = normalizeFileName(baseName);
         return baseName;
     }
