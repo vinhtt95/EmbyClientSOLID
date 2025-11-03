@@ -11,6 +11,7 @@ import com.vinhtt.embyclientsolid.viewmodel.IItemDetailViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.ILibraryTreeViewModel;
 import com.vinhtt.embyclientsolid.viewmodel.impl.MainViewModel;
+import embyclient.model.BaseItemDto;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -123,25 +124,52 @@ public class MainController {
 
     private void loadSubViews() {
         try {
-            libraryTreeController = loadNestedFXML("LibraryTreeView.fxml", leftPaneContainer);
-            if (libraryTreeController != null) {
-                libraryTreeController.setViewModel(libraryTreeViewModel);
-            }
+            // 1. LibraryTreeController
+            libraryTreeController = new LibraryTreeController(); // <-- TẠO MỚI
+            loadAndInjectFXML("LibraryTreeView.fxml", libraryTreeController, leftPaneContainer); // <-- TIÊM
+            libraryTreeController.setViewModel(libraryTreeViewModel); // <-- BIND
 
-            itemGridController = loadNestedFXML("ItemGridView.fxml", centerPaneContainer);
-            if (itemGridController != null) {
-                itemGridController.setViewModel(itemGridViewModel, notificationService, configService);
-            }
+            // 2. ItemGridController
+            itemGridController = new ItemGridController(); // <-- TẠO MỚI
+            loadAndInjectFXML("ItemGridView.fxml", itemGridController, centerPaneContainer); // <-- TIÊM
+            itemGridController.setViewModel(itemGridViewModel, notificationService, configService); // <-- BIND
 
-            itemDetailController = loadNestedFXML("ItemDetailView.fxml", rightPaneContainer);
-            if (itemDetailController != null) {
-                itemDetailController.setViewModel(itemDetailViewModel, configService);
-            }
+            // 3. ItemDetailController
+            itemDetailController = new ItemDetailController(); // <-- TẠO MỚI
+            loadAndInjectFXML("ItemDetailView.fxml", itemDetailController, rightPaneContainer); // <-- TIÊM
+            itemDetailController.setViewModel(itemDetailViewModel, configService); // <-- BIND
 
         } catch (IOException e) {
             e.printStackTrace();
             statusLabel.setText(configService.getString("mainView", "errorLoadUI"));
         }
+    }
+
+    /**
+     * Helper mới để tải FXML và tiêm (inject) Controller đã được tạo.
+     *
+     * @param fxmlFile Tên file FXML (ví dụ: "LibraryTreeView.fxml")
+     * @param controllerInstance Instance của Controller đã được tạo (ví dụ: new LibraryTreeController())
+     * @param container AnchorPane (cột) để chứa nội dung
+     * @throws IOException
+     */
+    private void loadAndInjectFXML(String fxmlFile, Object controllerInstance, AnchorPane container) throws IOException {
+        URL fxmlUrl = MainApp.class.getResource("view/fxml/" + fxmlFile);
+        if (fxmlUrl == null) {
+            throw new IOException("Không tìm thấy FXML: " + fxmlFile);
+        }
+
+        FXMLLoader loader = new FXMLLoader(fxmlUrl);
+        loader.setController(controllerInstance); // <-- TIÊM CONTROLLER VÀO LOADER
+
+        Node node = loader.load(); // <-- TẢI FXML (sẽ không tạo controller mới)
+
+        // Gắn node vào AnchorPane (như code cũ)
+        AnchorPane.setTopAnchor(node, 0.0);
+        AnchorPane.setBottomAnchor(node, 0.0);
+        AnchorPane.setLeftAnchor(node, 0.0);
+        AnchorPane.setRightAnchor(node, 0.0);
+        container.getChildren().add(node);
     }
 
     private void bindCommonUI() {
@@ -249,6 +277,42 @@ public class MainController {
                 itemDetailViewModel.clearAddChipCommand();
             }
         });
+
+        // 7. Chi tiết (Pop-out) -> AppNavigator
+        itemDetailViewModel.popOutRequestProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null && newV) {
+                BaseItemDto selectedItem = itemGridViewModel.selectedItemProperty().get();
+                if (selectedItem != null) {
+                    appNavigator.showPopOutDetail(selectedItem); // Truyền item
+                }
+                itemDetailViewModel.clearPopOutRequest(); // Reset cờ
+            }
+        });
+    }
+
+    public ItemGridController getItemGridController() {
+        return itemGridController;
+    }
+
+    public ItemDetailController getItemDetailController() {
+        return itemDetailController;
+    }
+
+    /**
+     * Đăng ký Hotkeys (khi app được focus) trên Scene chính.
+     * Được gọi từ MainApp.
+     */
+    public void registerGlobalHotkeys(Scene scene) {
+        if (scene == null) return;
+
+        // Gọi các helper (được sao chép từ EmbyClientJavaFX)
+        appNavigator.registerHotkeys(
+                scene,
+                this,
+                this.itemDetailController,
+                this.itemGridController,
+                this.itemGridViewModel
+        );
     }
 
     @FXML

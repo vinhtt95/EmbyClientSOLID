@@ -1,10 +1,8 @@
 package com.vinhtt.embyclientsolid.navigation;
 
 import com.vinhtt.embyclientsolid.MainApp;
-import com.vinhtt.embyclientsolid.controller.AddTagDialogController;
+import com.vinhtt.embyclientsolid.controller.*;
 import com.vinhtt.embyclientsolid.core.*;
-import com.vinhtt.embyclientsolid.controller.LoginController;
-import com.vinhtt.embyclientsolid.controller.MainController;
 import com.vinhtt.embyclientsolid.data.IExternalDataService;
 import com.vinhtt.embyclientsolid.data.IItemRepository;
 import com.vinhtt.embyclientsolid.data.IItemUpdateService;
@@ -28,6 +26,22 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import com.vinhtt.embyclientsolid.controller.ItemDetailController;
+import com.vinhtt.embyclientsolid.controller.ItemGridController;
+import com.vinhtt.embyclientsolid.controller.MainController;
+import com.vinhtt.embyclientsolid.model.SuggestionContext;
+import com.vinhtt.embyclientsolid.model.Tag;
+import com.vinhtt.embyclientsolid.viewmodel.AddTagResult;
+import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
+import com.vinhtt.embyclientsolid.viewmodel.impl.ItemDetailViewModel;
+import embyclient.model.BaseItemDto;
+import javafx.scene.Node;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 
 import java.io.IOException;
 import java.net.URL;
@@ -50,6 +64,7 @@ public class AppNavigator implements IAppNavigator {
     private final IItemUpdateService itemUpdateService;
     private final IExternalDataService externalDataService;
 
+
     // (MỚI) Các hằng số để lưu vị trí dialog,
     // (copy từ ItemDetailController.java cũ)
     private static final String KEY_ADD_TAG_DIALOG_X = "addTagDialogX";
@@ -58,6 +73,13 @@ public class AppNavigator implements IAppNavigator {
     private static final String KEY_ADD_TAG_DIALOG_HEIGHT = "addTagDialogHeight";
 
     private Stage detailDialog; // Cho UR-50
+    private IItemDetailViewModel popOutDetailViewModel;
+
+    // Các hằng số để lưu vị trí/kích thước cửa sổ pop-out
+    private static final String KEY_DIALOG_WIDTH = "popOutDialogWidth";
+    private static final String KEY_DIALOG_HEIGHT = "popOutDialogHeight";
+    private static final String KEY_DIALOG_X = "popOutDialogX";
+    private static final String KEY_DIALOG_Y = "popOutDialogY";
 
     public AppNavigator(
             Stage primaryStage,
@@ -236,13 +258,192 @@ public class AppNavigator implements IAppNavigator {
     }
 
     @Override
-    public void showPopOutDetail() {
-        // (Giai đoạn 12)
+    public void showPopOutDetail(BaseItemDto item) {
+        if (item == null) return;
+
+        try {
+            // Chỉ tạo dialog nếu nó chưa tồn tại
+            if (detailDialog == null) {
+                // 1. Tạo VM MỚI cho pop-out
+                this.popOutDetailViewModel = new ItemDetailViewModel(
+                        itemRepository, itemUpdateService, staticDataRepository,
+                        externalDataService, localInteractionService, notificationService,
+                        sessionService, null, // Pop-out VM không cần tham chiếu đến TreeVM
+                        configService
+                );
+
+                // 2. Tải FXML
+                URL fxmlUrl = MainApp.class.getResource("view/fxml/ItemDetailView.fxml");
+                FXMLLoader loader = new FXMLLoader(fxmlUrl);
+
+                // 3. Tạo Controller MỚI
+                ItemDetailController controller = new ItemDetailController();
+                loader.setController(controller);
+                Parent root = loader.load();
+
+                // 4. Tiêm VM vào Controller MỚI
+                controller.setViewModel(this.popOutDetailViewModel, configService);
+
+                // 5. Cấu hình Stage
+                detailDialog = new Stage();
+                detailDialog.setTitle(configService.getString("itemDetailView", "popOutTitle"));
+
+                // 6. Lấy kích thước/vị trí đã lưu (UR-50)
+                double defaultWidth = 1000, defaultHeight = 800;
+                double savedWidth = preferenceService.getDouble(KEY_DIALOG_WIDTH, defaultWidth);
+                double savedHeight = preferenceService.getDouble(KEY_DIALOG_HEIGHT, defaultHeight);
+                double savedX = preferenceService.getDouble(KEY_DIALOG_X, -1);
+                double savedY = preferenceService.getDouble(KEY_DIALOG_Y, -1);
+
+                detailDialog.setWidth(savedWidth);
+                detailDialog.setHeight(savedHeight);
+                if (savedX != -1 && savedY != -1) detailDialog.setX(savedX);
+
+                // 7. Cài đặt Scene
+                Scene scene = new Scene(root);
+                URL cssUrl = MainApp.class.getResource("styles.css");
+                if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
+                detailDialog.setScene(scene);
+
+                // 8. Đăng ký hotkeys cho scene MỚI này (UR-13)
+                // (Chỉ truyền vào các thành phần mà pop-out có)
+                registerHotkeysForScene(scene, null, controller, null, null);
+
+                // 9. Lưu kích thước khi đóng (UR-50)
+                detailDialog.setOnCloseRequest(e -> {
+                    preferenceService.putDouble(KEY_DIALOG_WIDTH, detailDialog.getWidth());
+                    preferenceService.putDouble(KEY_DIALOG_HEIGHT, detailDialog.getHeight());
+                    preferenceService.putDouble(KEY_DIALOG_X, detailDialog.getX());
+                    preferenceService.putDouble(KEY_DIALOG_Y, detailDialog.getY());
+                    preferenceService.flush();
+                    detailDialog = null; // Hủy stage
+                    popOutDetailViewModel = null; // Hủy VM
+                });
+            }
+
+            // 10. Tải item (hoặc tải lại) và hiển thị
+            this.popOutDetailViewModel.loadItem(item);
+            detailDialog.show();
+            detailDialog.toFront();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            notificationService.showStatus("Lỗi mở pop-out: " + e.getMessage());
+        }
     }
 
     @Override
     public void closePopOutDetail() {
-        // (Giai đoạn 12)
+        if (detailDialog != null) {
+            detailDialog.close();
+            // (Listener OnCloseRequest sẽ tự dọn dẹp)
+        }
+    }
+
+    @Override
+    public void registerHotkeys(Scene scene, MainController mainController, ItemDetailController detailController, ItemGridController gridController, IItemGridViewModel gridViewModel) {
+        if (scene == null) return;
+
+        // (UR-14) Chỉ đăng ký điều hướng chuột nếu có GridVM (tức là scene chính)
+        if (gridViewModel != null) {
+            registerMouseNavigation(scene, gridViewModel);
+        }
+
+        // (UR-13) Đăng ký phím tắt chung
+        registerHotkeysForScene(scene, mainController, detailController, gridController, gridViewModel);
+    }
+
+    private void registerMouseNavigation(Scene scene, IItemGridViewModel gridViewModel) {
+        scene.setOnMouseClicked((MouseEvent event) -> {
+            if (event.getButton() == MouseButton.BACK) {
+                event.consume();
+                if (gridViewModel.canGoBackProperty().get()) {
+                    gridViewModel.navigateBack();
+                }
+            }
+            if (event.getButton() == MouseButton.FORWARD) {
+                event.consume();
+                if (gridViewModel.canGoForwardProperty().get()) {
+                    gridViewModel.navigateForward();
+                }
+            }
+        });
+    }
+
+    private void registerHotkeysForScene(Scene scene,
+                                         MainController mainController,
+                                         ItemDetailController detailController,
+                                         ItemGridController gridController,
+                                         IItemGridViewModel gridViewModel) // Sửa: Dùng IItemGridViewModel
+    {
+        if (scene == null) return;
+
+        // ENTER (Repeat Add Tag)
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ENTER && !event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown()) {
+                Node focusedNode = scene.getFocusOwner();
+                boolean isBlockingControl = focusedNode instanceof javafx.scene.control.TextInputControl ||
+                        focusedNode instanceof javafx.scene.control.Button ||
+                        focusedNode instanceof javafx.scene.control.ToggleButton;
+
+                if (focusedNode == null || !isBlockingControl) {
+                    if (detailController != null) {
+                        detailController.handleRepeatAddTagHotkey();
+                        event.consume();
+                    }
+                    // (Không cần fallback về mainController, vì detailController luôn tồn tại)
+                }
+            }
+        });
+
+        // CMD+S (Save)
+        final KeyCombination saveShortcut = new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN);
+        scene.getAccelerators().put(saveShortcut, () -> {
+            if (detailController != null) {
+                detailController.handleSaveHotkey();
+            }
+        });
+
+        // (Các phím tắt cho Grid)
+        if (gridViewModel != null) {
+            final KeyCombination nextShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN);
+            scene.getAccelerators().put(nextShortcut, gridViewModel::selectNextItem);
+
+            final KeyCombination prevShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN);
+            scene.getAccelerators().put(prevShortcut, gridViewModel::selectPreviousItem);
+
+            final KeyCombination nextAndPlayShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
+            scene.getAccelerators().put(nextAndPlayShortcut, gridViewModel::selectAndPlayNextItem);
+
+            final KeyCombination prevAndPlayShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
+            scene.getAccelerators().put(prevAndPlayShortcut, gridViewModel::selectAndPlayPreviousItem);
+
+            // BACK/FORWARD (ALT+LEFT/RIGHT)
+            final KeyCombination backShortcutWin = new KeyCodeCombination(KeyCode.LEFT, KeyCombination.ALT_DOWN);
+            scene.getAccelerators().put(backShortcutWin, () -> {
+                if (gridViewModel.canGoBackProperty().get()) gridViewModel.navigateBack();
+            });
+            final KeyCombination forwardShortcutWin = new KeyCodeCombination(KeyCode.RIGHT, KeyCombination.ALT_DOWN);
+            scene.getAccelerators().put(forwardShortcutWin, () -> {
+                if (gridViewModel.canGoForwardProperty().get()) gridViewModel.navigateForward();
+            });
+
+            // BACK/FORWARD (CMD+[ / ])
+            final KeyCombination backShortcutMac = new KeyCodeCombination(KeyCode.OPEN_BRACKET, KeyCombination.SHORTCUT_DOWN);
+            scene.getAccelerators().put(backShortcutMac, () -> {
+                if (gridViewModel.canGoBackProperty().get()) gridViewModel.navigateBack();
+            });
+            final KeyCombination forwardShortcutMac = new KeyCodeCombination(KeyCode.CLOSE_BRACKET, KeyCombination.SHORTCUT_DOWN);
+            scene.getAccelerators().put(forwardShortcutMac, () -> {
+                if (gridViewModel.canGoForwardProperty().get()) gridViewModel.navigateForward();
+            });
+        }
+
+        // (Hotkey của Grid Controller)
+        if (gridController != null) {
+            final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
+            scene.getAccelerators().put(playShortcut, gridController::playSelectedItem);
+        }
     }
 
     /**

@@ -94,6 +94,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
     // --- Properties Sự kiện (Event) ---
     private final ReadOnlyObjectWrapper<ChipClickEvent> chipClickEvent = new ReadOnlyObjectWrapper<>(null);
     private final ReadOnlyObjectWrapper<SuggestionContext> addChipCommand = new ReadOnlyObjectWrapper<>(null);
+    private final ReadOnlyObjectWrapper<Boolean> popOutRequest = new ReadOnlyObjectWrapper<>(null);
 
 
     public ItemDetailViewModel(IItemRepository itemRepository, IItemUpdateService itemUpdateService,
@@ -532,6 +533,10 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         String path = itemPath.get();
         try {
             localInteractionService.openFileOrFolder(path);
+
+            if (!isFolder.get()) {
+                Platform.runLater(() -> popOutRequest.set(true));
+            }
         } catch (Exception e) {
             notificationService.showStatus(configService.getString("itemDetailView", "errorOpenPath", e.getMessage()));
         }
@@ -708,6 +713,16 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         } else if (result.isCopy()) {
             copyPropertiesFromItemCommand(result.getCopyId(), context);
         }
+    }
+
+    @Override
+    public ReadOnlyObjectProperty<Boolean> popOutRequestProperty() {
+        return popOutRequest.getReadOnlyProperty();
+    }
+
+    @Override
+    public void clearPopOutRequest() {
+        popOutRequest.set(null);
     }
 
     private void copyPropertiesFromItemCommand(String sourceItemId, SuggestionContext context) {

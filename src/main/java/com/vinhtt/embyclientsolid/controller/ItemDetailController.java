@@ -578,4 +578,26 @@ public class ItemDetailController {
     private Stage getStage() {
         return (Stage) rootPane.getScene().getWindow();
     }
+
+    /**
+     * Xử lý hotkey ENTER từ AppNavigator/MainController.
+     */
+    public void handleRepeatAddTagHotkey() {
+        if (viewModel != null) {
+            viewModel.repeatAddChipCommand();
+        }
+    }
+
+    /**
+     * Xử lý hotkey CMD+S từ AppNavigator/MainController.
+     */
+    public void handleSaveHotkey() {
+        if (viewModel != null && !viewModel.isDirtyProperty().get()) {
+            // Không có gì để lưu
+            return;
+        }
+        if (viewModel != null) {
+            viewModel.saveChangesCommand();
+        }
+    }
 }

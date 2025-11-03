@@ -1,8 +1,14 @@
 package com.vinhtt.embyclientsolid.core;
 
+import com.vinhtt.embyclientsolid.controller.ItemDetailController;
+import com.vinhtt.embyclientsolid.controller.ItemGridController;
+import com.vinhtt.embyclientsolid.controller.MainController;
 import com.vinhtt.embyclientsolid.model.SuggestionContext;
 import com.vinhtt.embyclientsolid.model.Tag;
 import com.vinhtt.embyclientsolid.viewmodel.AddTagResult;
+import com.vinhtt.embyclientsolid.viewmodel.IItemGridViewModel;
+import embyclient.model.BaseItemDto;
+import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 /**
@@ -42,12 +48,27 @@ public interface IAppNavigator {
     AddTagResult showAddTagDialog(Stage ownerStage, SuggestionContext context);
 
     /**
-     * Hiển thị cửa sổ chi tiết "pop-out" (UR-50).
-     */
-    void showPopOutDetail();
-
-    /**
      * Đóng cửa sổ chi tiết "pop-out" (nếu đang mở).
      */
     void closePopOutDetail();
+
+    /**
+     * Hiển thị cửa sổ chi tiết "pop-out".
+     * @param item Item để hiển thị trong cửa sổ pop-out.
+     */
+    void showPopOutDetail(BaseItemDto item);
+
+    /**
+     * &#x110;&#x103;ng k&yacute; c&aacute;c ph&iacute;m t&#x1EAF;t v&agrave; &#x111;i&#x1EC1;u h&#x1B0;&#x1EDB;ng chu&#x1ED9;t cho m&#x1ED9;t Scene.
+     * @param scene Scene (c&#x1EED;a s&#x1ED5; ch&iacute;nh ho&#x1EB7;c pop-out).
+     * @param mainController (T&ugrave;y ch&#x1ECD;n) Controller ch&iacute;nh (d&ugrave;ng cho Enter).
+     * @param detailController Controller chi ti&#x1EBF;t (d&ugrave;ng cho Cmd+S, Enter).
+     * @param gridController Controller l&#x1B0;&#x1EDB;i (d&ugrave;ng cho Cmd+Enter Play).
+     * @param gridViewModel ViewModel l&#x1B0;&#x1EDB;i (d&ugrave;ng cho &#x111;i&#x1EC1;u h&#x1B0;&#x1EDB;ng N/P, Back/Forward).
+     */
+    void registerHotkeys(Scene scene,
+                         MainController mainController,
+                         ItemDetailController detailController,
+                         ItemGridController gridController,
+                         IItemGridViewModel gridViewModel);
 }

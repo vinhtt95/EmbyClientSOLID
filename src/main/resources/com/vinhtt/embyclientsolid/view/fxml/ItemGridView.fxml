@@ -12,8 +12,7 @@
 <StackPane fx:id="rootPane"
            style="-fx-background-color: #1a1a1a;"
            xmlns="http://javafx.com/javafx/21"
-           xmlns:fx="http://javafx.com/fxml/1"
-           fx:controller="com.vinhtt.embyclientsolid.controller.ItemGridController">
+           xmlns:fx="http://javafx.com/fxml/1">
     <children>
         <ScrollPane fx:id="gridScrollPane" fitToWidth="true" hbarPolicy="NEVER" style="-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;"
                     visible="false">

@@ -294,4 +294,16 @@ public class ItemGridController {
         // Fallback (ảnh placeholder) nếu ViewModel bị null hoặc không trả về URL
         return "https://placehold.co/" + (int)CELL_WIDTH + "x" + (int)IMAGE_HEIGHT + "/333/999?text=" + (item.getType() != null ? item.getType() : "Item");
     }
+
+    /**
+     * Xử lý hotkey CMD+ENTER từ AppNavigator/MainController.
+     */
+    public void playSelectedItem() {
+        if (viewModel != null) {
+            BaseItemDto selectedItem = viewModel.selectedItemProperty().get();
+            if (selectedItem != null) {
+                viewModel.playItemCommand(selectedItem);
+            }
+        }
+    }
 }

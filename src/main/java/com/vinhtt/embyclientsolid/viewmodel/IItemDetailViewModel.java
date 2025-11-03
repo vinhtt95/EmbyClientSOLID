@@ -115,4 +115,15 @@ public interface IItemDetailViewModel {
             this.type = type;
         }
     }
+
+    /**
+     * @return Property (chỉ-đọc) sẽ chuyển thành true khi VM
+     * yêu cầu mở cửa sổ pop-out (ví dụ: sau khi nhấn Play).
+     */
+    ReadOnlyObjectProperty<Boolean> popOutRequestProperty();
+
+    /**
+     * Reset cờ yêu cầu pop-out sau khi đã xử lý.
+     */
+    void clearPopOutRequest();
 }
