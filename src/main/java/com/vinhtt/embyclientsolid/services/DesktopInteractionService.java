@@ -13,39 +13,48 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Triển khai (Implementation) của ILocalInteractionService.
- * Sử dụng java.awt.Desktop để tương tác với hệ thống file.
- * Chứa logic nghiệp vụ tạo file .srt (UR-40).
+ * Triển khai của {@link ILocalInteractionService}.
+ * Sử dụng {@code java.awt.Desktop} để tương tác với hệ thống file của người dùng.
+ * Chịu trách nhiệm mở file/thư mục và chứa logic nghiệp vụ để tạo file subtitle (.srt)
+ * theo yêu cầu (UR-40, UR-43).
  */
 public class DesktopInteractionService implements ILocalInteractionService {
 
     /**
-     * Key để lấy đường dẫn screenshot trong config.json (UR-43).
-     *
+     * Khóa (key) để tra cứu đường dẫn cơ sở của thư mục screenshot
+     * trong tệp {@code config.json} (UR-43).
      */
     private static final String KEY_SCREENSHOT_BASE_PATH = "appSettings.screenshotBasePath";
 
     private final IConfigurationService configService;
 
     /**
-     * Khởi tạo service.
-     * @param configService Service Config (DI) để lấy I18n strings và đường dẫn.
+     * Khởi tạo dịch vụ DesktopInteraction.
+     *
+     * @param configService Dịch vụ Cấu hình (DI) để lấy các chuỗi I18n và đường dẫn
+     * từ {@code config.json}.
      */
     public DesktopInteractionService(IConfigurationService configService) {
         this.configService = configService;
     }
 
     /**
-     * Kiểm tra xem Desktop API có được hỗ trợ không.
+     * Kiểm tra xem {@code java.awt.Desktop} có được hệ điều hành hiện tại hỗ trợ không.
+     *
+     * @throws UnsupportedOperationException Nếu Desktop API không được hỗ trợ.
      */
     private void checkDesktopSupport() throws UnsupportedOperationException {
         if (!Desktop.isDesktopSupported()) {
+            // Ném lỗi nếu HĐH không hỗ trợ (ví dụ: môi trường server không đầu)
             throw new UnsupportedOperationException(
                     configService.getString("itemDetailView", "errorDesktopAPINotSupported")
             );
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void openFileOrFolder(String path) throws IOException, UnsupportedOperationException {
         checkDesktopSupport();
@@ -55,14 +64,19 @@ public class DesktopInteractionService implements ILocalInteractionService {
 
         File fileOrDir = new File(path);
         if (!fileOrDir.exists()) {
+            // Ném lỗi nếu đường dẫn không tồn tại trên hệ thống
             throw new FileNotFoundException(
                     configService.getString("itemDetailView", "errorPathNotExist", path)
             );
         }
 
+        // Ủy thác cho HĐH mở file/thư mục bằng ứng dụng mặc định
         Desktop.getDesktop().open(fileOrDir);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void openContainingFolder(String path) throws IOException, UnsupportedOperationException {
         checkDesktopSupport();
@@ -77,56 +91,65 @@ public class DesktopInteractionService implements ILocalInteractionService {
             );
         }
 
+        // Lấy thư mục cha của file
         File parentDir = file.getParentFile();
         if (parentDir != null && parentDir.exists()) {
+            // Mở thư mục cha
             Desktop.getDesktop().open(parentDir);
         } else {
-            throw new IOException("Không thể tìm thấy thư mục cha cho: " + path);
+            throw new IOException(configService.getString("exceptions", "parentFolderNotFound", path));
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void openScreenshotFolder(String mediaFileName) throws IOException, IllegalStateException, UnsupportedOperationException {
         checkDesktopSupport();
 
-        // 1. Lấy đường dẫn base từ config (UR-43)
-        //
+        // 1. Lấy đường dẫn cơ sở (base path) từ config.json (UR-43)
         String basePath = configService.getString(KEY_SCREENSHOT_BASE_PATH);
         if (basePath == null || basePath.isEmpty() || basePath.equals(KEY_SCREENSHOT_BASE_PATH)) {
+            // Ném lỗi nếu config chưa được thiết lập
             throw new IllegalStateException(configService.getString("itemDetailView", "errorScreenshotPathBase"));
         }
 
-        // 2. Lấy tên file
+        // 2. Kiểm tra tên file media
         if (mediaFileName == null || mediaFileName.isEmpty()) {
-            throw new FileNotFoundException("Tên file media rỗng.");
+            throw new FileNotFoundException(configService.getString("exceptions", "mediaFileNameEmpty"));
         }
 
-        // 3. Xây dựng đường dẫn và mở
+        // 3. Xây dựng đường dẫn đầy đủ (basePath + mediaFileName) và mở
         File screenshotFolder = new File(basePath, mediaFileName);
         openFileOrFolder(screenshotFolder.getAbsolutePath());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public File openSubtitleFile(String mediaPath, String srtTitleContent) throws IOException, UnsupportedOperationException {
         checkDesktopSupport();
 
-        // 1. Tạo đường dẫn .srt
+        // 1. Xác định đường dẫn .srt (ví dụ: "video.mp4" -> "video.srt")
         String srtPath = getSrtPath(mediaPath);
 
-        // 2. Tạo file nếu chưa tồn tại (Logic UR-40)
-        //
+        // 2. Logic tạo file nếu chưa tồn tại (UR-40)
         File srtFile = new File(srtPath);
         if (!srtFile.exists()) {
             try {
+                // Gọi helper để tạo file .srt với nội dung tiêu đề
                 createSrtFile(srtFile, srtTitleContent);
             } catch (IOException e) {
+                // Bọc lỗi với thông báo I18n
                 throw new IOException(
                         configService.getString("itemDetailView", "errorSubtitleCreate", e.getMessage()), e
                 );
             }
         }
 
-        // 3. Mở file .srt
+        // 3. Mở file .srt (bằng trình editor mặc định)
         try {
             Desktop.getDesktop().open(srtFile);
         } catch (Exception openEx) {
@@ -139,42 +162,55 @@ public class DesktopInteractionService implements ILocalInteractionService {
     }
 
     /**
-     * Helper tạo đường dẫn .srt từ đường dẫn .mp4.
+     * Xây dựng đường dẫn tệp {@code .srt} từ đường dẫn tệp media.
+     *
+     * @param mediaPath Đường dẫn tệp media (ví dụ: "/path/to/video.mp4").
+     * @return Đường dẫn tệp subtitle tương ứng (ví dụ: "/path/to/video.srt").
+     * @throws IOException Nếu đường dẫn media không hợp lệ (không có phần mở rộng).
      */
     private String getSrtPath(String mediaPath) throws IOException {
         int dotIndex = mediaPath.lastIndexOf('.');
         if (dotIndex == -1) {
-            throw new IOException("Đường dẫn media không hợp lệ (không có phần mở rộng): " + mediaPath);
+            throw new IOException(configService.getString("exceptions", "mediaPathInvalid", mediaPath));
         }
+        // Thay thế phần mở rộng (ví dụ: .mp4) bằng .srt
         return mediaPath.substring(0, dotIndex) + ".srt";
     }
 
     /**
-     * Helper tạo file .srt mới với UTF-8 BOM và nội dung.
-     * (Logic từ ItemDetailController.handleOpenSubtitleAction)
+     * Tạo một tệp {@code .srt} mới với nội dung tiêu đề (UR-40).
+     * Tệp sẽ được mã hóa UTF-8 và bao gồm BOM (Byte Order Mark)
+     * để đảm bảo tương thích ký tự.
+     *
+     * @param srtFile         File .srt để tạo.
+     * @param srtTitleContent Nội dung tiêu đề (Title) của item để ghi vào phụ đề đầu tiên.
+     * @throws IOException Nếu có lỗi khi ghi file.
      */
     private void createSrtFile(File srtFile, String srtTitleContent) throws IOException {
+        // Sử dụng try-with-resources để đảm bảo writer được đóng
         try (FileOutputStream fos = new FileOutputStream(srtFile);
              OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
              BufferedWriter writer = new BufferedWriter(osw)) {
 
             // 1. Ghi BOM (Byte Order Mark) cho UTF-8 (UR-40)
+            // Điều này cần thiết để nhiều trình phát media đọc đúng ký tự tiếng Việt
             writer.write('\uFEFF');
 
-            // 2. Ghi nội dung (UR-40)
+            // 2. Ghi nội dung subtitle đầu tiên (Tiêu đề)
             writer.write("1");
             writer.newLine();
-            writer.write("00:00:03,000 --> 00:00:10,000");
+            writer.write("00:00:03,000 --> 00:00:10,000"); // Mốc thời gian
             writer.newLine();
             writer.write(srtTitleContent != null ? srtTitleContent : ""); // Ghi Tiêu đề
             writer.newLine();
             writer.newLine();
-            // (Thêm các mốc thời gian trống khác nếu muốn, như trong code cũ)
+
+            // 3. Ghi mốc thời gian trống thứ hai (theo code cũ)
             writer.write("2");
             writer.newLine();
             writer.write("00:30:00,000 --> 00:30:10,000");
             writer.newLine();
-            writer.write("");
+            writer.write(""); // Nội dung trống
             writer.newLine();
             writer.newLine();
 

@@ -48,12 +48,14 @@ import java.io.IOException;
 import java.net.URL;
 
 /**
- * Triển khai (Implementation) của IAppNavigator.
- * (Cập nhật GĐ 11: Thêm logic lưu/khôi phục vị trí AddTagDialog).
+ * Triển khai của {@link IAppNavigator}.
+ * Lớp này quản lý việc chuyển đổi giữa các Scene (Màn hình) và hiển thị các
+ * cửa sổ (Stage) và dialog. Nó đóng vai trò trung tâm trong việc khởi tạo
+ * các cặp View-ViewModel và tiêm (inject) các dependency.
+ * (UR-5, UR-35, UR-50).
  */
 public class AppNavigator implements IAppNavigator {
 
-    // ... (Các trường services giữ nguyên) ...
     private final Stage primaryStage;
     private final IEmbySessionService sessionService;
     private final IConfigurationService configService;
@@ -65,26 +67,41 @@ public class AppNavigator implements IAppNavigator {
     private final IItemUpdateService itemUpdateService;
     private final IExternalDataService externalDataService;
 
-
-    // (MỚI) Các hằng số để lưu vị trí dialog,
-    // (copy từ ItemDetailController.java cũ)
+    // Hằng số để lưu trữ vị trí và kích thước của dialog "Add Tag"
     private static final String KEY_ADD_TAG_DIALOG_X = "addTagDialogX";
     private static final String KEY_ADD_TAG_DIALOG_Y = "addTagDialogY";
     private static final String KEY_ADD_TAG_DIALOG_WIDTH = "addTagDialogWidth";
     private static final String KEY_ADD_TAG_DIALOG_HEIGHT = "addTagDialogHeight";
 
-    private Stage detailDialog; // Cho UR-50
-    private IItemDetailViewModel popOutDetailViewModel;
-    private IItemGridViewModel mainGridVM;
-    private IItemDetailViewModel mainDetailVM;
-    private MainController mainControllerRef;
-
-    // Các hằng số để lưu vị trí/kích thước cửa sổ pop-out
+    // Hằng số để lưu trữ vị trí và kích thước của cửa sổ "Pop-out" (UR-50)
     private static final String KEY_DIALOG_WIDTH = "popOutDialogWidth";
     private static final String KEY_DIALOG_HEIGHT = "popOutDialogHeight";
     private static final String KEY_DIALOG_X = "popOutDialogX";
     private static final String KEY_DIALOG_Y = "popOutDialogY";
 
+    // Tham chiếu đến cửa sổ pop-out chi tiết (UR-50)
+    private Stage detailDialog;
+    // Tham chiếu đến các ViewModel chính, được chia sẻ giữa MainView và Pop-out
+    private IItemGridViewModel mainGridVM;
+    private IItemDetailViewModel mainDetailVM;
+    // Tham chiếu đến MainController để gọi ẩn/hiện cột 3 khi pop-out
+    private MainController mainControllerRef;
+
+
+    /**
+     * Khởi tạo AppNavigator với tất cả các dependencies của ứng dụng (DI).
+     *
+     * @param primaryStage         Stage chính của ứng dụng.
+     * @param sessionService       Dịch vụ quản lý phiên đăng nhập.
+     * @param configService        Dịch vụ đọc file cấu hình.
+     * @param preferenceService    Dịch vụ lưu trữ cài đặt người dùng.
+     * @param notificationService  Dịch vụ hiển thị thông báo.
+     * @param localInteractionService Dịch vụ tương tác file cục bộ.
+     * @param itemRepository       Dịch vụ ĐỌC dữ liệu item.
+     * @param staticDataRepository Dịch vụ ĐỌC dữ liệu tĩnh (gợi ý).
+     * @param itemUpdateService    Dịch vụ GHI dữ liệu item.
+     * @param externalDataService  Dịch vụ gọi API bên ngoài.
+     */
     public AppNavigator(
             Stage primaryStage,
             IEmbySessionService sessionService,
@@ -109,31 +126,44 @@ public class AppNavigator implements IAppNavigator {
         this.externalDataService = externalDataService;
     }
 
-    // ... (hàm initialize, showLogin, showMain giữ nguyên) ...
-
     @Override
     public void initialize(Stage stage) {
-        // (Không cần, Stage đã được inject)
+        // Phương thức này không được sử dụng vì Stage được tiêm qua constructor.
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void showLogin() {
         try {
+            // 1. Khởi tạo ViewModel cho Login
             ILoginViewModel viewModel = new LoginViewModel(sessionService, this, configService);
+
+            // 2. Lắng nghe kết quả đăng nhập thành công từ ViewModel
             viewModel.loginSuccessProperty().addListener((obs, oldVal, newVal) -> {
-                if (newVal) showMain();
+                if (newVal) showMain(); // Nếu thành công, gọi showMain()
             });
+
+            // 3. Khởi tạo Controller và tiêm ViewModel
             LoginController controller = new LoginController(viewModel, configService);
+
+            // 4. Tải FXML và hiển thị Scene
             loadScene("LoginView.fxml", configService.getString("mainApp", "loginTitle"), controller, primaryStage, false);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void showMain() {
         try {
-            // 1. Tạo MainViewModel
+            // Đây là "Composition Root" cho màn hình chính.
+
+            // 1. Khởi tạo MainViewModel (điều phối chung)
             MainViewModel mainViewModel = new MainViewModel(
                     sessionService,
                     this,
@@ -141,7 +171,7 @@ public class AppNavigator implements IAppNavigator {
                     configService
             );
 
-            // 2. Tạo các ViewModel con
+            // 2. Khởi tạo các ViewModel con cho 3 cột
             ILibraryTreeViewModel libraryTreeViewModel = new LibraryTreeViewModel(
                     itemRepository,
                     notificationService,
@@ -168,10 +198,11 @@ public class AppNavigator implements IAppNavigator {
                     configService
             );
 
+            // 3. Lưu lại tham chiếu đến các VM sẽ được chia sẻ (cho pop-out)
             this.mainGridVM = itemGridViewModel;
             this.mainDetailVM = itemDetailViewModel;
 
-            // 3. Tạo MainController và tiêm
+            // 4. Khởi tạo MainController và tiêm tất cả các VM
             MainController controller = new MainController(
                     mainViewModel,
                     libraryTreeViewModel,
@@ -180,10 +211,10 @@ public class AppNavigator implements IAppNavigator {
                     configService,
                     preferenceService,
                     notificationService,
-                    this // Tiêm IAppNavigator
+                    this // Tiêm chính AppNavigator vào MainController
             );
 
-            // 4. Tải FXML
+            // 5. Tải FXML và hiển thị Scene
             loadScene("MainView.fxml", configService.getString("mainApp", "mainTitle"), controller, primaryStage, false);
 
         } catch (IOException e) {
@@ -192,7 +223,7 @@ public class AppNavigator implements IAppNavigator {
     }
 
     /**
-     * (SỬA ĐỔI GĐ 11) Triển khai hiển thị dialog Add Tag (UR-35).
+     * {@inheritDoc}
      */
     @Override
     public AddTagResult showAddTagDialog(Stage ownerStage, SuggestionContext context) {
@@ -200,13 +231,13 @@ public class AppNavigator implements IAppNavigator {
             URL fxmlUrl = MainApp.class.getResource("view/fxml/AddTagDialog.fxml");
             FXMLLoader loader = new FXMLLoader(fxmlUrl);
 
-            // 1. Tạo ViewModel
+            // 1. Khởi tạo ViewModel cho Dialog
             IAddTagViewModel viewModel = new AddTagViewModel(
                     staticDataRepository,
                     itemRepository,
                     configService
             );
-            viewModel.setContext(context);
+            viewModel.setContext(context); // Thiết lập bối cảnh (VD: đang thêm TAG hay STUDIO)
 
             // 2. Tải FXML
             Parent root = loader.load();
@@ -214,11 +245,11 @@ public class AppNavigator implements IAppNavigator {
 
             // 3. Cấu hình Stage (Cửa sổ)
             Stage dialogStage = new Stage();
-            dialogStage.titleProperty().bind(viewModel.titleProperty());
+            dialogStage.titleProperty().bind(viewModel.titleProperty()); // Title động
             dialogStage.initModality(Modality.WINDOW_MODAL);
             dialogStage.initOwner(ownerStage);
 
-            // --- (MỚI) KHÔI PHỤC VỊ TRÍ/KÍCH THƯỚC (Logic từ ItemDetailController.java cũ) ---
+            // 4. Khôi phục vị trí/kích thước dialog đã lưu
             double defaultWidth = 550.0;
             double defaultHeight = 700.0;
             double savedX = preferenceService.getDouble(KEY_ADD_TAG_DIALOG_X, -1);
@@ -233,7 +264,7 @@ public class AppNavigator implements IAppNavigator {
             dialogStage.setWidth(savedWidth);
             dialogStage.setHeight(savedHeight);
 
-            // --- (MỚI) LƯU VỊ TRÍ/KÍCH THƯỚC KHI ĐÓNG (Logic từ ItemDetailController.java cũ) ---
+            // 5. Lắng nghe sự kiện đóng để lưu vị trí/kích thước
             dialogStage.setOnCloseRequest(e -> {
                 try {
                     preferenceService.putDouble(KEY_ADD_TAG_DIALOG_X, dialogStage.getX());
@@ -245,64 +276,66 @@ public class AppNavigator implements IAppNavigator {
                     System.err.println("Lỗi khi lưu vị trí/kích thước AddTagDialog: " + ex.getMessage());
                 }
             });
-            // --- KẾT THÚC THÊM MỚI ---
 
+            // 6. Cài đặt Scene và CSS
             Scene scene = new Scene(root);
             scene.getStylesheets().addAll(ownerStage.getScene().getStylesheets());
             dialogStage.setScene(scene);
 
-            // 4. Tiêm ViewModel, Stage, và ConfigService vào Controller
+            // 7. Tiêm ViewModel, Stage, và ConfigService vào Controller
             controller.setViewModel(viewModel, dialogStage, configService);
 
-            // 5. Hiển thị và chờ
+            // 8. Hiển thị dialog và chờ người dùng nhập
             dialogStage.showAndWait();
 
-            // 6. Trả về kết quả từ ViewModel
+            // 9. Trả về kết quả (AddTagResult) từ ViewModel
             return viewModel.getResult();
 
         } catch (IOException e) {
             e.printStackTrace();
-            notificationService.showStatus("Lỗi: Không thể mở dialog. " + e.getMessage());
+            notificationService.showStatus(configService.getString("exceptions", "dialogError", e.getMessage()));
             return null;
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void showPopOutDetail(BaseItemDto item, Object mainController) {
         if (item == null) return;
 
         try {
-            // Lưu tham chiếu đến MainController
+            // Lưu tham chiếu đến MainController để ẩn/hiện cột 3
             if (mainController instanceof MainController) {
                 this.mainControllerRef = (MainController) mainController;
             }
 
-            // Chỉ tạo dialog nếu nó chưa tồn tại
+            // Chỉ tạo cửa sổ pop-out nếu nó chưa tồn tại
             if (detailDialog == null) {
 
-                // 2. Tải FXML
+                // 1. Tải FXML
                 URL fxmlUrl = MainApp.class.getResource("view/fxml/ItemDetailView.fxml");
                 FXMLLoader loader = new FXMLLoader(fxmlUrl);
 
-                // 3. Tạo Controller MỚI
+                // 2. Tạo một Controller MỚI cho cửa sổ pop-out
                 ItemDetailController controller = new ItemDetailController();
                 loader.setController(controller);
                 Parent root = loader.load();
 
-                // 4. Tiêm VM vào Controller MỚI
+                // 3. Tiêm ViewModel CHI TIẾT (đã được chia sẻ) vào Controller MỚI
                 if (this.mainDetailVM == null) {
-                    notificationService.showStatus("Lỗi: VM chi tiết chính chưa được khởi tạo.");
+                    notificationService.showStatus(configService.getString("exceptions", "vmNotInitialized"));
                     return;
                 }
                 controller.setViewModel(this.mainDetailVM, configService);
 
-                // 5. Cấu hình Stage
+                // 4. Cấu hình Stage
                 detailDialog = new Stage();
                 detailDialog.setTitle(configService.getString("itemDetailView", "popOutTitle"));
+                detailDialog.initModality(Modality.NONE); // Không khóa cửa sổ chính
 
-                detailDialog.initModality(Modality.NONE);
-
-                // 6. Lấy kích thước/vị trí đã lưu (UR-50)
+                // 5. Khôi phục kích thước/vị trí đã lưu (UR-50)
                 double defaultWidth = 1000, defaultHeight = 800;
                 double savedWidth = preferenceService.getDouble(KEY_DIALOG_WIDTH, defaultWidth);
                 double savedHeight = preferenceService.getDouble(KEY_DIALOG_HEIGHT, defaultHeight);
@@ -313,99 +346,112 @@ public class AppNavigator implements IAppNavigator {
                 detailDialog.setHeight(savedHeight);
                 if (savedX != -1 && savedY != -1) detailDialog.setX(savedX);
 
-                // 7. Cài đặt Scene
+                // 6. Cài đặt Scene và CSS
                 Scene scene = new Scene(root);
                 URL cssUrl = MainApp.class.getResource("styles.css");
                 if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
                 detailDialog.setScene(scene);
 
+                // 7. Đăng ký phím tắt cho Scene MỚI này
                 registerHotkeysForScene(
                         scene,
                         null, // Không có MainController
                         controller,     // Controller CỘT 3 của pop-out
                         null, // Không có GridController
-                        this.mainGridVM // VM CỘT 2 (chung)
+                        this.mainGridVM // VM CỘT 2 (chung, để điều hướng Back/Fwd)
                 );
 
-                // 8. Đăng ký hotkeys cho scene MỚI này (UR-13)
-                // (Chỉ truyền vào các thành phần mà pop-out có)
+                // 8. Xử lý sự kiện "Add Tag" (Enter) cho cửa sổ pop-out (UR-13)
                 final IItemDetailViewModel sharedVM = this.mainDetailVM;
                 final Stage stage = detailDialog;
 
                 sharedVM.addChipCommandProperty().addListener((obs, oldCtx, newCtx) -> {
-                    // (MỚI) Chỉ kích hoạt nếu cửa sổ POP-UP (stage) đang focus
+                    // Chỉ kích hoạt nếu cửa sổ pop-up đang focus
                     if (newCtx != null && stage.isFocused()) {
-                        // Gọi hàm showAddTagDialog của chính AppNavigator
                         AddTagResult result = showAddTagDialog(stage, newCtx);
 
-                        // (SỬA LỖI FOCUS: Yêu cầu focus vào Nút gốc (root node) của Scene)
+                        // Trả focus về cửa sổ pop-up sau khi dialog đóng
                         Platform.runLater(root::requestFocus);
 
-                        // Gửi kết quả (hoặc null) trở lại ViewModel
                         sharedVM.processAddTagResult(result, newCtx);
                         sharedVM.clearAddChipCommand();
                     }
                 });
 
-                // 9. Lưu kích thước khi đóng (UR-50)
+                // 9. Lưu kích thước/vị trí khi đóng (UR-50)
                 detailDialog.setOnCloseRequest(e -> {
-                    // YÊU CẦU 1: Hiện lại cột detail khi đóng dialog
+                    // Hiện lại cột 3 ở cửa sổ chính
                     if (this.mainControllerRef != null) {
                         this.mainControllerRef.showDetailColumn();
-                        this.mainControllerRef = null; // Xóa tham chiếu
+                        this.mainControllerRef = null;
                     }
+                    // Lưu cài đặt cửa sổ pop-out
                     preferenceService.putDouble(KEY_DIALOG_WIDTH, detailDialog.getWidth());
                     preferenceService.putDouble(KEY_DIALOG_HEIGHT, detailDialog.getHeight());
                     preferenceService.putDouble(KEY_DIALOG_X, detailDialog.getX());
                     preferenceService.putDouble(KEY_DIALOG_Y, detailDialog.getY());
                     preferenceService.flush();
-                    detailDialog = null; // Hủy stage
+                    detailDialog = null; // Hủy stage để lần sau tạo lại
                 });
             }
 
-            // Hiện lại cột detail khi đóng dialog
+            // Yêu cầu MainController ẩn cột 3
             if (this.mainControllerRef != null) {
                 this.mainControllerRef.hideDetailColumn();
             }
 
+            // Hiển thị cửa sổ pop-out
             detailDialog.show();
             detailDialog.toFront();
 
         } catch (IOException e) {
             e.printStackTrace();
-            notificationService.showStatus("Lỗi mở pop-out: " + e.getMessage());
+            notificationService.showStatus(configService.getString("exceptions", "popupError", e.getMessage()));
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void closePopOutDetail() {
         if (detailDialog != null) {
             detailDialog.close();
-            // (Listener OnCloseRequest sẽ tự dọn dẹp)
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void registerHotkeys(Scene scene, MainController mainController, ItemDetailController detailController, ItemGridController gridController, IItemGridViewModel gridViewModel) {
         if (scene == null) return;
 
-        // (UR-14) Chỉ đăng ký điều hướng chuột nếu có GridVM (tức là scene chính)
+        // (UR-14) Đăng ký điều hướng bằng nút Back/Forward của chuột
         if (gridViewModel != null) {
             registerMouseNavigation(scene, gridViewModel);
         }
 
-        // (UR-13) Đăng ký phím tắt chung
+        // (UR-13) Đăng ký các phím tắt
         registerHotkeysForScene(scene, mainController, detailController, gridController, gridViewModel);
     }
 
+    /**
+     * Đăng ký sự kiện click chuột cho điều hướng Back/Forward (UR-14).
+     *
+     * @param scene         Scene để lắng nghe.
+     * @param gridViewModel ViewModel của lưới (chứa logic Back/Forward).
+     */
     private void registerMouseNavigation(Scene scene, IItemGridViewModel gridViewModel) {
         scene.setOnMouseClicked((MouseEvent event) -> {
+            // Xử lý nút Back của chuột
             if (event.getButton() == MouseButton.BACK) {
                 event.consume();
                 if (gridViewModel.canGoBackProperty().get()) {
                     gridViewModel.navigateBack();
                 }
             }
+            // Xử lý nút Forward của chuột
             if (event.getButton() == MouseButton.FORWARD) {
                 event.consume();
                 if (gridViewModel.canGoForwardProperty().get()) {
@@ -415,18 +461,28 @@ public class AppNavigator implements IAppNavigator {
         });
     }
 
+    /**
+     * Đăng ký các phím tắt (UR-13) cho một Scene cụ thể.
+     *
+     * @param scene            Scene (của MainView hoặc Pop-out)
+     * @param mainController   Controller chính (chỉ có ở MainView)
+     * @param detailController Controller chi tiết (có ở cả 2)
+     * @param gridController   Controller lưới (chỉ có ở MainView)
+     * @param gridViewModel    ViewModel lưới (luôn được chia sẻ)
+     */
     private void registerHotkeysForScene(Scene scene,
                                          MainController mainController,
                                          ItemDetailController detailController,
                                          ItemGridController gridController,
-                                         IItemGridViewModel gridViewModel) // gridViewModel dùng cho Mouse Nav
+                                         IItemGridViewModel gridViewModel)
     {
         if (scene == null) return;
 
-        // --- ENTER (Repeat Add Tag) ---
-        // Luôn gọi mainDetailVM (vì nó được chia sẻ)
+        // Phím ENTER (Lặp lại Add Tag - UR-13)
+        // Luôn gọi VM chi tiết (vì nó được chia sẻ)
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ENTER && !event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown()) {
+                // Chỉ kích hoạt nếu focus không nằm trên một control (như Button, TextField)
                 Node focusedNode = scene.getFocusOwner();
                 boolean isBlockingControl = focusedNode instanceof javafx.scene.control.TextInputControl ||
                         focusedNode instanceof javafx.scene.control.Button ||
@@ -441,62 +497,62 @@ public class AppNavigator implements IAppNavigator {
             }
         });
 
-        // --- CMD+S (Save) ---
-        // Luôn gọi mainDetailVM (vì nó được chia sẻ)
+        // Phím CMD+S (Lưu - UR-13)
+        // Luôn gọi VM chi tiết
         final KeyCombination saveShortcut = new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN);
         scene.getAccelerators().put(saveShortcut, () -> {
             if (this.mainDetailVM != null) {
-                // Kiểm tra isDirty() trước khi lưu
+                // Chỉ lưu nếu có thay đổi (dirty)
                 if (this.mainDetailVM.isDirtyProperty().get()) {
                     this.mainDetailVM.saveChangesCommand();
                 }
             }
         });
 
-        // --- CMD+ENTER (Play) ---
-        // Phím này CẦN biết ngữ cảnh (Context-Aware)
+        // Phím CMD+ENTER (Phát video - UR-13)
+        // Phím này phụ thuộc vào ngữ cảnh (scene nào đang active)
         final KeyCombination playShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.SHORTCUT_DOWN);
         if (gridController != null) {
-            // Scene chính: Hotkey "Play" gọi Grid Controller (Cột 2)
+            // Nếu ở Scene chính -> gọi GridController (phát item Cột 2)
             scene.getAccelerators().put(playShortcut, gridController::playSelectedItem);
         } else if (detailController != null) {
-            // Scene Pop-up: Hotkey "Play" gọi Detail Controller (Cột 3)
+            // Nếu ở Scene Pop-out -> gọi DetailController (phát item Cột 3)
             scene.getAccelerators().put(playShortcut, detailController::handlePlayHotkey);
         }
 
-        // --- Phím tắt CỘT 2 (Grid) ---
-        // Luôn gọi mainGridVM (Toàn cục)
+        // Phím tắt của Cột 2 (Grid)
+        // Luôn gọi VM Lưới (vì nó được chia sẻ)
         if (this.mainGridVM != null) {
-            // CMD+N (Next)
+            // CMD+N (Chọn item tiếp theo)
             final KeyCombination nextShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(nextShortcut, this.mainGridVM::selectNextItem);
 
-            // CMD+P (Previous)
+            // CMD+P (Chọn item trước đó)
             final KeyCombination prevShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(prevShortcut, this.mainGridVM::selectPreviousItem);
 
-            // CMD+SHIFT+N (Next and Play)
+            // CMD+SHIFT+N (Chọn và Phát item tiếp theo)
             final KeyCombination nextAndPlayShortcut = new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
             scene.getAccelerators().put(nextAndPlayShortcut, this.mainGridVM::selectAndPlayNextItem);
 
-            // CMD+SHIFT+P (Previous and Play)
+            // CMD+SHIFT+P (Chọn và Phát item trước đó)
             final KeyCombination prevAndPlayShortcut = new KeyCodeCombination(KeyCode.P, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN);
             scene.getAccelerators().put(prevAndPlayShortcut, this.mainGridVM::selectAndPlayPreviousItem);
 
-            // BACK/FORWARD (ALT+LEFT/RIGHT)
+            // Phím Back (ALT+LEFT / CMD+[)
             final KeyCombination backShortcutWin = new KeyCodeCombination(KeyCode.LEFT, KeyCombination.ALT_DOWN);
             scene.getAccelerators().put(backShortcutWin, () -> {
                 if (this.mainGridVM.canGoBackProperty().get()) this.mainGridVM.navigateBack();
             });
-            final KeyCombination forwardShortcutWin = new KeyCodeCombination(KeyCode.RIGHT, KeyCombination.ALT_DOWN);
-            scene.getAccelerators().put(forwardShortcutWin, () -> {
-                if (this.mainGridVM.canGoForwardProperty().get()) this.mainGridVM.navigateForward();
-            });
-
-            // BACK/FORWARD (CMD+[ / ])
             final KeyCombination backShortcutMac = new KeyCodeCombination(KeyCode.OPEN_BRACKET, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(backShortcutMac, () -> {
                 if (this.mainGridVM.canGoBackProperty().get()) this.mainGridVM.navigateBack();
+            });
+
+            // Phím Forward (ALT+RIGHT / CMD+])
+            final KeyCombination forwardShortcutWin = new KeyCodeCombination(KeyCode.RIGHT, KeyCombination.ALT_DOWN);
+            scene.getAccelerators().put(forwardShortcutWin, () -> {
+                if (this.mainGridVM.canGoForwardProperty().get()) this.mainGridVM.navigateForward();
             });
             final KeyCombination forwardShortcutMac = new KeyCodeCombination(KeyCode.CLOSE_BRACKET, KeyCombination.SHORTCUT_DOWN);
             scene.getAccelerators().put(forwardShortcutMac, () -> {
@@ -507,29 +563,42 @@ public class AppNavigator implements IAppNavigator {
 
 
     /**
-     * Helper nội bộ để tải FXML, tiêm Controller, và hiển thị Scene.
+     * Tải FXML, tiêm Controller, và hiển thị Scene lên Stage.
+     *
+     * @param fxmlFile         Tên tệp FXML (ví dụ: "LoginView.fxml").
+     * @param title            Tiêu đề cửa sổ.
+     * @param controllerInstance Instance của Controller đã được khởi tạo (với VM).
+     * @param stage            Stage (cửa sổ) để hiển thị Scene.
+     * @param isDialog         Cờ cho biết đây có phải là dialog (để load lại CSS).
+     * @throws IOException Nếu không tìm thấy FXML.
      */
     private void loadScene(String fxmlFile, String title, Object controllerInstance, Stage stage, boolean isDialog) throws IOException {
         URL fxmlUrl = MainApp.class.getResource("view/fxml/" + fxmlFile);
         if (fxmlUrl == null) {
-            throw new IOException("Không tìm thấy FXML: " + fxmlFile);
+            throw new IOException(configService.getString("exceptions", "fxmlNotFound", fxmlFile));
         }
 
+        // 1. Khởi tạo FXMLLoader
         FXMLLoader loader = new FXMLLoader(fxmlUrl);
         if (controllerInstance != null) {
+            // 2. Tiêm Controller (thay vì để FXML tự tạo)
             loader.setController(controllerInstance);
         }
         Parent root = loader.load();
 
+        // 3. Cấu hình Scene
         Scene scene = stage.getScene();
         if (scene == null) {
+            // Nếu Scene chưa tồn tại (lần đầu khởi chạy), tạo Scene mới với kích thước đã lưu
             double width = preferenceService.getDouble("windowWidth", 2000);
             double height = preferenceService.getDouble("windowHeight", 1400);
             scene = new Scene(root, width, height);
         } else {
+            // Nếu Scene đã tồn tại, chỉ thay đổi nội dung (root)
             scene.setRoot(root);
         }
 
+        // 4. Áp dụng CSS
         URL cssUrl = MainApp.class.getResource("styles.css");
         if (cssUrl != null) {
             if (scene.getStylesheets().isEmpty() || isDialog) {
@@ -539,6 +608,7 @@ public class AppNavigator implements IAppNavigator {
             System.err.println("Không tìm thấy file styles.css");
         }
 
+        // 5. Hiển thị
         stage.setTitle(title);
         stage.setScene(scene);
         stage.show();

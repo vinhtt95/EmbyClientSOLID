@@ -7,43 +7,54 @@ import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.scene.control.TreeItem;
 
 /**
- * Interface cho LibraryTreeViewModel (Cột 1).
+ * Interface (Hợp đồng) cho LibraryTreeViewModel (Cột 1 - Cây thư viện).
+ * Định nghĩa trạng thái và hành vi của Cột 1.
  * (UR-15, UR-16, UR-17).
  */
 public interface ILibraryTreeViewModel {
 
     /**
-     * @return Property (chỉ-đọc) cho biết Cây thư viện có đang tải hay không.
+     * Báo cáo trạng thái đang tải (loading) của Cột 1.
+     *
+     * @return Property (chỉ đọc) {@code true} nếu đang tải thư viện
+     * hoặc tải các mục con.
      */
     ReadOnlyBooleanProperty loadingProperty();
 
     /**
-     * @return Property (chỉ-đọc) chứa TreeItem gốc (root) để binding với TreeView.
+     * Cung cấp {@link TreeItem} gốc (root) để liên kết (bind) với TreeView.
+     * Root này là một root "ảo" (không hiển thị).
+     *
+     * @return Property (chỉ đọc) chứa TreeItem gốc.
      */
     ReadOnlyObjectProperty<TreeItem<LibraryTreeItem>> rootItemProperty();
 
     /**
-     * @return Property (hai chiều) cho item đang được chọn trong TreeView.
-     * MainController sẽ lắng nghe property này.
+     * Quản lý item hiện đang được chọn trong cây (UR-15).
+     * MainController sẽ lắng nghe (listen) sự thay đổi của property này
+     * để kích hoạt tải Cột 2.
+     *
+     * @return Property (hai chiều) chứa TreeItem được chọn.
      */
     ObjectProperty<TreeItem<LibraryTreeItem>> selectedTreeItemProperty();
 
     /**
-     * Bắt đầu tải các thư viện gốc (root views) từ Emby.
-     * (UR-15).
+     * Bắt đầu hành động (Command) tải các thư viện gốc (root views)
+     * từ Emby (UR-15).
      */
     void loadLibraries();
 
     /**
-     * Tải các thư mục con cho một TreeItem (Lazy Loading).
-     * (UR-17).
-     * @param item Item cần tải con.
+     * Bắt đầu hành động (Command) tải các thư mục con cho một TreeItem
+     * (Lazy Loading - UR-17).
+     *
+     * @param item Item cha cần tải các mục con.
      */
     void loadChildrenForItem(TreeItem<LibraryTreeItem> item);
 
     /**
      * Xóa lựa chọn hiện tại trên cây.
-     * (Dùng cho nút Home - UR-10).
+     * (Được gọi bởi MainController khi nhấn nút Home - UR-10).
      */
     void clearSelection();
 }
