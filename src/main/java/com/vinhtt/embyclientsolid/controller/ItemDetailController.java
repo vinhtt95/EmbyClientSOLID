@@ -155,6 +155,20 @@ public class ItemDetailController {
         // 2. Binding UI cơ bản
         bindUIState();
 
+        // Lắng nghe khi ViewModel tải xong dữ liệu (loading từ true -> false)
+        viewModel.loadingProperty().addListener((obs, wasLoading, isLoading) -> {
+            if (wasLoading && !isLoading) {
+                // Sau khi tải xong (bao gồm cả sau khi Save),
+                // di chuyển focus về rootPane để không có trường nào
+                // bị "bôi đen" hoặc tự động focus.
+                Platform.runLater(() -> {
+                    if (rootPane != null) {
+                        rootPane.requestFocus();
+                    }
+                });
+            }
+        });
+
         // (MỚI) 3. Binding các nút Review (✓/✗)
         bindReviewButtons();
 
