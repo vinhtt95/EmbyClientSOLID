@@ -66,6 +66,8 @@
     "openButtonFolder": "Mở trong Finder",
     "openButtonFile": "Phát (Mặc định)",
     "openButtonSubtitle": "Mở Subtitle (.srt)",
+    "openButtonPrevious": "◀ Trước",
+    "openButtonNext": "Sau ▶",
     "tagsLabel": "Dung nhan",
     "genresLabel": "Trang phục",
     "studiosLabel": "Kịch bản",

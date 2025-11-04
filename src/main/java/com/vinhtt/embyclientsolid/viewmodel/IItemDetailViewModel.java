@@ -221,6 +221,44 @@ public interface IItemDetailViewModel {
      */
     void clearPopOutRequest();
 
+    /**
+     * Cung cấp sự kiện khi ViewModel yêu cầu Phát item Tiếp theo.
+     */
+    ReadOnlyBooleanProperty playNextRequestProperty();
+
+    /**
+     * Cung cấp sự kiện khi ViewModel yêu cầu Phát item Trước đó.
+     */
+    ReadOnlyBooleanProperty playPreviousRequestProperty();
+
+    /**
+     * Xóa (tiêu thụ) sự kiện yêu cầu phát tiếp theo.
+     */
+    void clearPlayNextRequest();
+
+    /**
+     * Xóa (tiêu thụ) sự kiện yêu cầu phát trước đó.
+     */
+    void clearPlayPreviousRequest();
+
+    /**
+     * (Command) Yêu cầu chọn và phát item tiếp theo.
+     */
+    void playNextItemCommand();
+
+    /**
+     * (Command) Yêu cầu chọn và phát item trước đó.
+     */
+    void playPreviousItemCommand();
+
+    /**
+     * Tải chi tiết item và tự động kích hoạt lệnh phát/pop-out sau khi tải xong.
+     * Dùng cho hotkey (Cmd+Shift+N/P) và nút Next/Previous.
+     *
+     * @param item DTO (tóm tắt) của item được chọn từ Cột 2.
+     */
+    void loadItemAndPlay(BaseItemDto item);
+
     // --- Hành động (Commands từ View) ---
 
     /**

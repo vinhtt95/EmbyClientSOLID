@@ -253,18 +253,20 @@ public class MainController {
         itemGridViewModel.selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             // Bỏ qua nếu Cột 2 đang tải do click chip (logic ở mục 5)
             if (!isChipLoading) {
-                // ...tải chi tiết của nó vào Cột 3
-                itemDetailViewModel.loadItem(newVal);
 
-                // Xử lý hotkey Cmd+Shift+N/P (Tự động Play sau khi chọn)
-                if (itemGridViewModel.isPlayAfterSelect()) {
-                    if (newVal != null && Boolean.FALSE.equals(newVal.isIsFolder())) {
-                        // 1. Yêu cầu Cột 2 phát file
-                        itemGridViewModel.playItemCommand(newVal);
-                        // 2. Yêu cầu Cột 3 kích hoạt cờ Pop-out
-                        itemDetailViewModel.openFileOrFolderCommand();
-                    }
-                    itemGridViewModel.clearPlayAfterSelect(); // Xóa cờ
+                // 1. Lấy cờ TỪ GridVM
+                boolean autoPlay = itemGridViewModel.isPlayAfterSelect();
+
+                if (autoPlay) {
+                    // Nếu là hotkey (Cmd+Shift+N/P) hoặc nút (Prev/Next)
+                    // Gọi hàm "Tải VÀ Phát" của DetailVM
+                    itemDetailViewModel.loadItemAndPlay(newVal);
+                    // Xóa cờ trong GridVM
+                    itemGridViewModel.clearPlayAfterSelect();
+                } else {
+                    // Nếu chỉ là click chuột đơn
+                    // Chỉ gọi hàm "Tải"
+                    itemDetailViewModel.loadItem(newVal);
                 }
             }
         });
@@ -344,6 +346,24 @@ public class MainController {
                     appNavigator.showPopOutDetail(selectedItem, this);
                 }
                 itemDetailViewModel.clearPopOutRequest(); // Reset cờ
+            }
+        });
+
+        // 8. Chi tiết (Click Play Next) -> Lưới (Select + Play Next)
+        itemDetailViewModel.playNextRequestProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null && newV) {
+                // Yêu cầu GridVM chọn và kích hoạt cờ "play"
+                itemGridViewModel.selectAndPlayNextItem();
+                itemDetailViewModel.clearPlayNextRequest(); // Reset cờ
+            }
+        });
+
+        // 9. Chi tiết (Click Play Previous) -> Lưới (Select + Play Previous)
+        itemDetailViewModel.playPreviousRequestProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null && newV) {
+                // Yêu cầu GridVM chọn và kích hoạt cờ "play"
+                itemGridViewModel.selectAndPlayPreviousItem();
+                itemDetailViewModel.clearPlayPreviousRequest(); // Reset cờ
             }
         });
     }

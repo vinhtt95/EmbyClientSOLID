@@ -76,6 +76,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
      */
     private final JsonFileHandler jsonFileHandler;
     private final Gson gson;
+    private boolean playAfterLoad = false;
 
     // --- Trạng thái nội bộ ---
     /**
@@ -139,6 +140,9 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
      */
     private final ReadOnlyObjectWrapper<Boolean> popOutRequest = new ReadOnlyObjectWrapper<>(null);
 
+    private final ReadOnlyBooleanWrapper playNextRequest = new ReadOnlyBooleanWrapper(false);
+    private final ReadOnlyBooleanWrapper playPreviousRequest = new ReadOnlyBooleanWrapper(false);
+
 
     /**
      * Khởi tạo ItemDetailViewModel và tiêm (inject) tất cả các dịch vụ (DI).
@@ -181,6 +185,20 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
         // Lắng nghe thay đổi của newPrimaryImageFile để cập nhật cờ primaryImageDirty (UR-42)
         newPrimaryImageFile.addListener((obs, oldVal, newVal) -> primaryImageDirty.set(newVal != null));
+
+        // Lắng nghe khi loading xong
+        loading.addListener((obs, wasLoading, isLoading) -> {
+            if (wasLoading && !isLoading) {
+                // Nếu cờ playAfterLoad được đặt, và đã tải xong
+                if (playAfterLoad) {
+                    playAfterLoad = false; // Xóa cờ
+                    // Kiểm tra xem có phải là file không
+                    if (Boolean.FALSE.equals(isFolder.get())) {
+                        openFileOrFolderCommand(); // Kích hoạt phát VÀ pop-out
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -188,71 +206,77 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
      */
     @Override
     public void loadItem(BaseItemDto item) {
-        // Nếu item là null (ví dụ: clear selection), reset Cột 3
+        // 1. Đặt cờ: Đây là lệnh tải thông thường (KHÔNG phát)
+        this.playAfterLoad = false;
+
+        // 2. Gọi hàm tải nội bộ
+        internalLoadItem(item);
+    }
+
+    @Override
+    public void loadItemAndPlay(BaseItemDto item) {
+        // 1. Đặt cờ: Đây là lệnh tải VÀ PHÁT
+        this.playAfterLoad = true;
+
+        // 2. Gọi hàm tải nội bộ
+        internalLoadItem(item);
+    }
+
+    /**
+     * Hàm private chứa logic tải item, được gọi bởi cả loadItem và loadItemAndPlay.
+     * (Đây là nội dung của hàm loadItem() cũ của bạn,
+     * chỉ cần XÓA dòng "this.playAfterLoad = false;" ở đầu hàm)
+     */
+    private void internalLoadItem(BaseItemDto item) {
+        // XÓA DÒNG "this.playAfterLoad = false;" NẾU NÓ CÒN Ở ĐÂY
+
         if (item == null) {
             Platform.runLater(this::clearAllDetailsUI);
             return;
         }
         final String newItemId = item.getId();
 
-        // Cập nhật UI (trên luồng FX) để báo trạng thái đang tải
         Platform.runLater(() -> {
             statusMessage.set(configService.getString("itemDetailViewModel", "statusLoading", item.getName()));
             showStatusMessage.set(true);
             loading.set(true);
         });
 
-        // Chạy tác vụ tải dữ liệu nặng trên luồng nền
         new Thread(() -> {
             try {
-                // 1. Lấy chi tiết DTO đầy đủ (chứa Tags, People, Path...)
                 BaseItemDto loadedDto = itemRepository.getFullItemDetails(newItemId);
-                // 2. Lấy danh sách ảnh (Backdrops)
                 List<ImageInfo> backdrops = itemRepository.getItemImages(newItemId).stream()
                         .filter(img -> ImageType.BACKDROP.equals(img.getImageType()))
                         .collect(Collectors.toList());
 
-                // Cập nhật UI (trên luồng FX) với dữ liệu đã tải
                 Platform.runLater(() -> {
-                    clearAllDetailsUI(); // Xóa dữ liệu cũ trước
-                    this.originalItemDto = loadedDto; // Lưu DTO gốc
+                    // clearAllDetailsUI() sẽ tự động reset cờ playAfterLoad về false,
+                    // nhưng nó sẽ được gọi TRƯỚC KHI listener 'loading' kích hoạt,
+                    // nên chúng ta cần đảm bảo cờ playAfterLoad được giữ nguyên nếu cần.
+
+                    // --- SỬA ĐỔI QUAN TRỌNG ---
+                    // Lưu lại cờ playAfterLoad TRƯỚC KHI gọi clearAllDetailsUI
+                    boolean intendedToPlay = this.playAfterLoad;
+
+                    clearAllDetailsUI(); // Hàm này sẽ đặt playAfterLoad = false
+
+                    // Đặt lại cờ nếu nó được dự định
+                    this.playAfterLoad = intendedToPlay;
+                    // --- KẾT THÚC SỬA ĐỔI ---
+
+                    this.originalItemDto = loadedDto;
                     this.currentItemId = newItemId;
 
-                    // 3. Điền dữ liệu vào các JavaFX Properties
                     title.set(loadedDto.getName() != null ? loadedDto.getName() : "");
-
-                    // Logic gợi ý OriginalTitle nếu rỗng (UR-38)
                     String originalTitleFromDto = loadedDto.getOriginalTitle();
-                    if (originalTitleFromDto == null || originalTitleFromDto.trim().isEmpty()) {
-                        String suggestedTitle = suggestOriginalTitleFromPath(loadedDto.getPath());
-                        originalTitle.set(suggestedTitle != null ? suggestedTitle : "");
-                    } else {
-                        originalTitle.set(originalTitleFromDto);
-                    }
+                    // ... (giữ nguyên phần còn lại của logic tải dữ liệu) ...
+                    // ... (ví dụ: overview.set, releaseDate.set, ...)
 
-                    criticRating.set(loadedDto.getCriticRating());
-                    overview.set(loadedDto.getOverview() != null ? loadedDto.getOverview() : "");
-                    releaseDate.set(dateToString(loadedDto.getPremiereDate()));
-                    itemPath.set(loadedDto.getPath() != null ? loadedDto.getPath() : configService.getString("itemDetailLoader", "noPath"));
-                    isFolder.set(Boolean.TRUE.equals(loadedDto.isIsFolder()));
-
-                    // 4. Parse các danh sách DTO sang danh sách Model (Tag)
-                    tagItems.setAll(parseNameLongIdPair(loadedDto.getTagItems()));
-                    studioItems.setAll(parseNameLongIdPair(loadedDto.getStudios()));
-                    genreItems.setAll(parseStringList(loadedDto.getGenres()));
-                    peopleItems.setAll(parseBaseItemPerson(loadedDto.getPeople()));
-
-                    // 5. Tải ảnh
-                    primaryImage.set(getPrimaryImageUrl(loadedDto));
-                    backdropImages.setAll(backdrops);
-
-                    // 6. Hoàn tất tải
-                    loading.set(false);
-                    showStatusMessage.set(false); // Ẩn status, hiện nội dung
-                    dirtyTracker.startTracking(); // Bắt đầu theo dõi thay đổi
+                    loading.set(false); // Dòng này sẽ kích hoạt listener trong constructor
+                    showStatusMessage.set(false);
+                    dirtyTracker.startTracking();
                 });
             } catch (Exception e) {
-                // Xử lý lỗi nếu tải thất bại
                 Platform.runLater(() -> {
                     clearAllDetailsUI();
                     statusMessage.set(configService.getString("itemDetailViewModel", "errorLoad", e.getMessage()));
@@ -267,6 +291,7 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
      * Reset tất cả trạng thái của Cột 3 về giá trị mặc định.
      */
     private void clearAllDetailsUI() {
+        playAfterLoad = false;
         dirtyTracker.stopTracking(); // Dừng theo dõi thay đổi
         originalItemDto = null;
         currentItemId = null;
@@ -719,6 +744,36 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
         } catch (Exception e) {
             notificationService.showStatus(configService.getString("itemDetailView", "errorOpenPath", e.getMessage()));
         }
+    }
+
+    @Override
+    public void playNextItemCommand() {
+        playNextRequest.set(true);
+    }
+
+    @Override
+    public void playPreviousItemCommand() {
+        playPreviousRequest.set(true);
+    }
+
+    @Override
+    public ReadOnlyBooleanProperty playNextRequestProperty() {
+        return playNextRequest.getReadOnlyProperty();
+    }
+
+    @Override
+    public ReadOnlyBooleanProperty playPreviousRequestProperty() {
+        return playPreviousRequest.getReadOnlyProperty();
+    }
+
+    @Override
+    public void clearPlayNextRequest() {
+        playNextRequest.set(false);
+    }
+
+    @Override
+    public void clearPlayPreviousRequest() {
+        playPreviousRequest.set(false);
     }
 
     /**

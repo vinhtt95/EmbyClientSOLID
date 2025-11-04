@@ -119,6 +119,8 @@ public class ItemDetailController {
     @FXML private Button acceptPeopleButton;
     @FXML private Button rejectPeopleButton;
     @FXML private Label overviewLabel;
+    @FXML private Button previousButton;
+    @FXML private Button nextButton;
 
 
     private IItemDetailViewModel viewModel;
@@ -222,6 +224,10 @@ public class ItemDetailController {
         // Cài đặt I18n cho các nút Review (✓/✗)
         String acceptText = configService.getString("itemDetailView", "acceptButton");
         String rejectText = configService.getString("itemDetailView", "rejectButton");
+
+        previousButton.setText(configService.getString("itemDetailView", "openButtonPrevious"));
+        nextButton.setText(configService.getString("itemDetailView", "openButtonNext"));
+
         acceptTitleButton.setText(acceptText);
         rejectTitleButton.setText(rejectText);
         acceptCriticRatingButton.setText(acceptText);
@@ -288,6 +294,17 @@ public class ItemDetailController {
                         .then(configService.getString("itemDetailView", "openButtonFolder"))
                         .otherwise(configService.getString("itemDetailView", "openButtonFile"))
         );
+
+        // (Giống như openSubtitleButton)
+        previousButton.visibleProperty().bind(
+                pathContainer.visibleProperty().and(viewModel.isFolderProperty().not())
+        );
+        previousButton.managedProperty().bind(previousButton.visibleProperty());
+
+        nextButton.visibleProperty().bind(
+                pathContainer.visibleProperty().and(viewModel.isFolderProperty().not())
+        );
+        nextButton.managedProperty().bind(nextButton.visibleProperty());
 
         // Nút Subtitle (UR-40) chỉ hiển thị khi là file (không phải folder)
         openSubtitleButton.visibleProperty().bind(
@@ -474,6 +491,9 @@ public class ItemDetailController {
         openButton.setOnAction(e -> viewModel.openFileOrFolderCommand());
         openSubtitleButton.setOnAction(e -> viewModel.openSubtitleCommand());
         primaryImageContainer.setOnMouseClicked(e -> viewModel.openScreenshotFolderCommand());
+
+        previousButton.setOnAction(e -> viewModel.playPreviousItemCommand());
+        nextButton.setOnAction(e -> viewModel.playNextItemCommand());
 
         // Commands Ảnh (UR-41, UR-42)
         savePrimaryImageButton.setOnAction(e -> viewModel.saveNewPrimaryImageCommand());
