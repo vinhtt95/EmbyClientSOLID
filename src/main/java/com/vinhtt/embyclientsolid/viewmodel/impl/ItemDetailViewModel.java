@@ -224,12 +224,8 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
     /**
      * Hàm private chứa logic tải item, được gọi bởi cả loadItem và loadItemAndPlay.
-     * (Đây là nội dung của hàm loadItem() cũ của bạn,
-     * chỉ cần XÓA dòng "this.playAfterLoad = false;" ở đầu hàm)
      */
     private void internalLoadItem(BaseItemDto item) {
-        // XÓA DÒNG "this.playAfterLoad = false;" NẾU NÓ CÒN Ở ĐÂY
-
         if (item == null) {
             Platform.runLater(this::clearAllDetailsUI);
             return;
@@ -244,17 +240,15 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
         new Thread(() -> {
             try {
+                // 1. Lấy dữ liệu từ Repo
                 BaseItemDto loadedDto = itemRepository.getFullItemDetails(newItemId);
                 List<ImageInfo> backdrops = itemRepository.getItemImages(newItemId).stream()
                         .filter(img -> ImageType.BACKDROP.equals(img.getImageType()))
                         .collect(Collectors.toList());
 
+                // 2. Cập nhật UI trên luồng JavaFX
                 Platform.runLater(() -> {
-                    // clearAllDetailsUI() sẽ tự động reset cờ playAfterLoad về false,
-                    // nhưng nó sẽ được gọi TRƯỚC KHI listener 'loading' kích hoạt,
-                    // nên chúng ta cần đảm bảo cờ playAfterLoad được giữ nguyên nếu cần.
-
-                    // --- SỬA ĐỔI QUAN TRỌNG ---
+                    // --- SỬA LỖI QUAN TRỌNG (TỪ LẦN TRƯỚC) ---
                     // Lưu lại cờ playAfterLoad TRƯỚC KHI gọi clearAllDetailsUI
                     boolean intendedToPlay = this.playAfterLoad;
 
@@ -262,15 +256,34 @@ public class ItemDetailViewModel implements IItemDetailViewModel {
 
                     // Đặt lại cờ nếu nó được dự định
                     this.playAfterLoad = intendedToPlay;
-                    // --- KẾT THÚC SỬA ĐỔI ---
+                    // --- KẾT THÚC SỬA LỖI ---
 
+                    // --- PHẦN BỊ THIẾU MÀ TÔI QUÊN ---
                     this.originalItemDto = loadedDto;
                     this.currentItemId = newItemId;
 
                     title.set(loadedDto.getName() != null ? loadedDto.getName() : "");
                     String originalTitleFromDto = loadedDto.getOriginalTitle();
-                    // ... (giữ nguyên phần còn lại của logic tải dữ liệu) ...
-                    // ... (ví dụ: overview.set, releaseDate.set, ...)
+                    if (originalTitleFromDto == null || originalTitleFromDto.trim().isEmpty()) {
+                        String suggestedTitle = suggestOriginalTitleFromPath(loadedDto.getPath());
+                        originalTitle.set(suggestedTitle != null ? suggestedTitle : "");
+                    } else {
+                        originalTitle.set(originalTitleFromDto);
+                    }
+                    criticRating.set(loadedDto.getCriticRating());
+                    overview.set(loadedDto.getOverview() != null ? loadedDto.getOverview() : "");
+                    releaseDate.set(dateToString(loadedDto.getPremiereDate()));
+                    itemPath.set(loadedDto.getPath() != null ? loadedDto.getPath() : configService.getString("itemDetailLoader", "noPath"));
+                    isFolder.set(Boolean.TRUE.equals(loadedDto.isIsFolder()));
+
+                    tagItems.setAll(parseNameLongIdPair(loadedDto.getTagItems()));
+                    studioItems.setAll(parseNameLongIdPair(loadedDto.getStudios()));
+                    genreItems.setAll(parseStringList(loadedDto.getGenres()));
+                    peopleItems.setAll(parseBaseItemPerson(loadedDto.getPeople()));
+
+                    primaryImage.set(getPrimaryImageUrl(loadedDto));
+                    backdropImages.setAll(backdrops);
+                    // --- KẾT THÚC PHẦN BỊ THIẾU ---
 
                     loading.set(false); // Dòng này sẽ kích hoạt listener trong constructor
                     showStatusMessage.set(false);

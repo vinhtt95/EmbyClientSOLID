@@ -116,8 +116,8 @@
                                             <TextField fx:id="pathTextField" editable="false" HBox.hgrow="ALWAYS" />
                                             <Button fx:id="previousButton" minWidth="80.0" />
                                             <Button fx:id="openButton" minWidth="100.0"/>
-                                            <Button fx:id="nextButton" minWidth="80.0" />
                                             <Button fx:id="openSubtitleButton" minWidth="100.0"/>
+                                            <Button fx:id="nextButton" minWidth="80.0" />
                                         </children>
                                     </HBox>
                                 </children>
