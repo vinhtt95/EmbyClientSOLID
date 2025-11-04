@@ -13,18 +13,20 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Helper class để theo dõi trạng thái "dirty" (đã thay đổi) của ItemDetailViewModel.
- * Hỗ trợ logic phức tạp của Import/Export (UR-48, UR-49).
- * Logic được port từ ItemDetailDirtyTracker.java (cũ).
+ * Lớp helper (trợ giúp) để theo dõi trạng thái "dirty" (đã thay đổi) của
+ * {@link ItemDetailViewModel}.
+ * Lớp này chụp một "snapshot" (ảnh chụp) dữ liệu gốc khi item được tải
+ * và so sánh nó với dữ liệu UI hiện tại để xác định xem nút "Lưu" (Save)
+ * có nên được kích hoạt hay không (UR-48).
+ * Nó cũng quản lý logic trạng thái phức tạp khi import (UR-49).
  */
 public class ItemDetailDirtyTracker {
 
     private final IItemDetailViewModel viewModel;
     private final BooleanProperty isDirty = new SimpleBooleanProperty(false);
 
-    /**
-     * Snapshot của dữ liệu gốc khi item được tải.
-     */
+    // --- Snapshot (Ảnh chụp) ---
+    // Lưu trữ trạng thái của item ngay sau khi tải xong
     private String originalTitle, originalOverview, originalReleaseDate, originalOriginalTitle;
     private Float originalCriticRating;
     private List<Tag> originalTagItems;
@@ -32,9 +34,9 @@ public class ItemDetailDirtyTracker {
     private List<Tag> originalPeopleItems;
     private List<Tag> originalGenreItems;
 
-    /**
-     * Listeners để theo dõi thay đổi.
-     */
+    // --- Listeners ---
+    // Các listener này sẽ được gắn vào các Property của ViewModel
+    // để gọi `checkForChanges()` mỗi khi có thay đổi
     private final ChangeListener<String> stringListener = (obs, oldVal, newVal) -> checkForChanges();
     private final ChangeListener<Number> ratingListener = (obs, oldVal, newVal) -> checkForChanges();
     private final ListChangeListener<Tag> tagsListener = (c) -> checkForChanges();
@@ -42,10 +44,11 @@ public class ItemDetailDirtyTracker {
     private final ListChangeListener<Tag> peopleItemsListener = (c) -> checkForChanges();
     private final ListChangeListener<Tag> genreItemsListener = (c) -> checkForChanges();
 
-    /**
-     * Cờ trạng thái.
-     */
+    // --- Cờ trạng thái ---
+    // Cờ `paused`: Dừng theo dõi (ví dụ: khi đang import JSON)
     private boolean paused = false;
+    // Cờ `importAcceptancePending`: Đang ở trạng thái chờ chấp nhận (✓)
+    // Nút "Lưu" sẽ bị vô hiệu hóa ngay cả khi có thay đổi (UR-48)
     private boolean importAcceptancePending = false;
 
     public ItemDetailDirtyTracker(IItemDetailViewModel viewModel) {
@@ -53,18 +56,20 @@ public class ItemDetailDirtyTracker {
     }
 
     /**
-     * Bắt đầu theo dõi (sau khi tải item).
+     * Bắt đầu theo dõi thay đổi.
+     * Được gọi bởi ViewModel sau khi tải xong item.
      */
     public void startTracking() {
-        updateOriginalsFromCurrent(); // Lấy snapshot
-        addListeners();
+        updateOriginalsFromCurrent(); // Chụp snapshot
+        addListeners(); // Gắn listener
         paused = false;
         importAcceptancePending = false;
-        isDirty.set(false);
+        isDirty.set(false); // Reset trạng thái
     }
 
     /**
-     * Dừng theo dõi (khi clear item).
+     * Dừng theo dõi thay đổi.
+     * Được gọi bởi ViewModel khi xóa chi tiết (clear) item.
      */
     public void stopTracking() {
         removeListeners();
@@ -75,14 +80,14 @@ public class ItemDetailDirtyTracker {
     }
 
     /**
-     * Được gọi bởi ImportHandler TRƯỚC KHI cập nhật UI.
-     * (UR-46).
+     * Được gọi bởi ImportHandler TRƯỚC KHI cập nhật UI (UR-46).
+     * Đặt trạng thái "chờ chấp nhận" (✓) và vô hiệu hóa nút Lưu.
      */
     public void startImport() {
         if (!importAcceptancePending) {
             importAcceptancePending = true;
             isDirty.set(false); // Vô hiệu hóa nút Save
-            pauseTracking(); // Dừng listener
+            pauseTracking(); // Tạm dừng listener
         }
     }
 
@@ -91,12 +96,12 @@ public class ItemDetailDirtyTracker {
      */
     public void endImport() {
         if (importAcceptancePending) {
-            resumeTracking(); // Bật lại listener (sẽ tự gọi checkForChanges)
+            resumeTracking(); // Bật lại listener (sẽ tự động gọi checkForChanges)
         }
     }
 
     /**
-     * Tạm dừng theo dõi.
+     * Tạm dừng theo dõi (xóa listener).
      */
     public void pauseTracking() {
         if (!paused) {
@@ -106,20 +111,23 @@ public class ItemDetailDirtyTracker {
     }
 
     /**
-     * Tiếp tục theo dõi.
+     * Tiếp tục theo dõi (gắn lại listener).
      */
     public void resumeTracking() {
         if (paused) {
             addListeners();
             paused = false;
-            checkForChanges(); // Kiểm tra ngay
+            checkForChanges(); // Kiểm tra ngay lập tức
         }
     }
 
+    /**
+     * Gắn listener vào tất cả các Property của ViewModel.
+     */
     private void addListeners() {
         viewModel.titleProperty().addListener(stringListener);
-        // (SỬA LỖI: Không lắng nghe rating, vì nó tự lưu (UR-33))
-        // viewModel.criticRatingProperty().addListener(ratingListener);
+        // (UR-33) KHÔNG lắng nghe CriticRating, vì nó tự lưu
+        // và không kích hoạt trạng thái "dirty" của nút Save chính (UR-48).
         viewModel.overviewProperty().addListener(stringListener);
         viewModel.releaseDateProperty().addListener(stringListener);
         viewModel.originalTitleProperty().addListener(stringListener);
@@ -129,9 +137,11 @@ public class ItemDetailDirtyTracker {
         viewModel.getGenreItems().addListener(genreItemsListener);
     }
 
+    /**
+     * Xóa tất cả listener.
+     */
     private void removeListeners() {
         viewModel.titleProperty().removeListener(stringListener);
-        // viewModel.criticRatingProperty().removeListener(ratingListener);
         viewModel.overviewProperty().removeListener(stringListener);
         viewModel.releaseDateProperty().removeListener(stringListener);
         viewModel.originalTitleProperty().removeListener(stringListener);
@@ -142,34 +152,34 @@ public class ItemDetailDirtyTracker {
     }
 
     /**
-     * Kiểm tra xem UI có khác gì so với snapshot gốc không.
-     * (UR-48).
+     * Logic cốt lõi: So sánh trạng thái UI hiện tại với "snapshot" gốc
+     * để xác định xem có thay đổi hay không (UR-48).
      */
     private void checkForChanges() {
-        if (paused) return;
+        if (paused) return; // Không kiểm tra nếu đang tạm dừng
 
         if (originalTitle == null && originalTagItems == null) {
-            isDirty.set(false); // Chưa start
+            isDirty.set(false); // Chưa bắt đầu theo dõi
             return;
         }
 
+        // So sánh các trường String
         boolean stringChanges = !Objects.equals(viewModel.titleProperty().get(), originalTitle) ||
                 !Objects.equals(viewModel.overviewProperty().get(), originalOverview) ||
                 !Objects.equals(viewModel.releaseDateProperty().get(), originalReleaseDate) ||
                 !Objects.equals(viewModel.originalTitleProperty().get(), originalOriginalTitle);
 
-        // (SỬA LỖI: UR-33 (Rating) không kích hoạt nút Save (UR-48))
-        boolean ratingChanges = false;
-
-        // (SỬA LỖI: So sánh nội dung List, không phải bản thân List)
+        // So sánh nội dung của các danh sách (List)
+        // (Phải tạo new ArrayList để so sánh nội dung, không phải tham chiếu)
         boolean tagChanges = !Objects.equals(new ArrayList<>(viewModel.getTagItems()), originalTagItems);
         boolean studioChanges = !Objects.equals(new ArrayList<>(viewModel.getStudioItems()), originalStudioItems);
         boolean peopleChanges = !Objects.equals(new ArrayList<>(viewModel.getPeopleItems()), originalPeopleItems);
         boolean genreChanges = !Objects.equals(new ArrayList<>(viewModel.getGenreItems()), originalGenreItems);
 
-        boolean changes = stringChanges || ratingChanges || tagChanges || studioChanges || peopleChanges || genreChanges;
+        boolean changes = stringChanges || tagChanges || studioChanges || peopleChanges || genreChanges;
 
-        // (SỬA LỖI (UR-48): Chuyển check này xuống cuối)
+        // (UR-48) Nếu đang ở chế độ import (chờ chấp nhận ✓),
+        // nút Save VẪN BỊ vô hiệu hóa, ngay cả khi có thay đổi.
         if (importAcceptancePending) {
             isDirty.set(false);
         } else {
@@ -178,22 +188,27 @@ public class ItemDetailDirtyTracker {
     }
 
     /**
-     * Kích hoạt 'isDirty' (thường do nhấn Accept ✓ hoặc sửa thủ công).
-     * (UR-47, UR-48).
+     * Kích hoạt 'isDirty' (bật nút Save) một cách cưỡng bức.
+     * Được gọi khi người dùng nhấn Accept (✓) (UR-47, UR-48)
+     * hoặc khi người dùng bắt đầu chỉnh sửa thủ công.
      */
     public void forceDirty() {
         if (paused) return;
 
         if (importAcceptancePending) {
+            // Nếu đang import, việc nhấn (✓) sẽ thoát khỏi chế độ import
+            // và kích hoạt nút Save.
             importAcceptancePending = false;
             isDirty.set(true);
         } else if (!isDirty.get()) {
+            // Nếu không import, chỉ cần kích hoạt nút Save
             isDirty.set(true);
         }
     }
 
     /**
-     * Cập nhật snapshot gốc (sau khi Tải hoặc Lưu thành công).
+     * Cập nhật "snapshot" gốc bằng dữ liệu UI hiện tại.
+     * Được gọi sau khi Tải item thành công hoặc Lưu item thành công.
      */
     public void updateOriginalsFromCurrent() {
         this.originalTitle = viewModel.titleProperty().get();
@@ -201,28 +216,35 @@ public class ItemDetailDirtyTracker {
         this.originalOverview = viewModel.overviewProperty().get();
         this.originalReleaseDate = viewModel.releaseDateProperty().get();
         this.originalCriticRating = viewModel.criticRatingProperty().get();
+        // (Phải tạo new ArrayList để sao chép giá trị, không phải tham chiếu)
         this.originalTagItems = new ArrayList<>(viewModel.getTagItems());
         this.originalStudioItems = new ArrayList<>(viewModel.getStudioItems());
         this.originalPeopleItems = new ArrayList<>(viewModel.getPeopleItems());
         this.originalGenreItems = new ArrayList<>(viewModel.getGenreItems());
-        importAcceptancePending = false;
-        checkForChanges();
+
+        importAcceptancePending = false; // Reset cờ import
+        checkForChanges(); // Kiểm tra lại (thường sẽ set isDirty=false)
     }
 
     /**
-     * Cập nhật snapshot chỉ cho rating (dùng cho UR-33).
+     * Cập nhật "snapshot" chỉ cho trường rating (dùng cho UR-33).
+     *
+     * @param newRating Điểm số mới.
      */
     public void updateOriginalRating(Float newRating) {
         if (paused) return;
         this.originalCriticRating = newRating;
         if (importAcceptancePending) {
-            // Nếu người dùng đang import VÀ nhấn nút rating,
-            // chúng ta coi như họ đã chấp nhận (UR-47)
+            // (UR-47) Nếu người dùng đang import VÀ nhấn nút rating,
+            // coi như họ đã chấp nhận (✓) thay đổi.
             importAcceptancePending = false;
         }
-        checkForChanges();
+        checkForChanges(); // Kiểm tra lại
     }
 
+    /**
+     * Xóa "snapshot" gốc.
+     */
     private void clearOriginals() {
         this.originalTitle = null;
         this.originalOriginalTitle = null;
@@ -235,6 +257,10 @@ public class ItemDetailDirtyTracker {
         this.originalGenreItems = null;
     }
 
+    /**
+     * Cung cấp Property 'isDirty' cho ViewModel để bind (liên kết)
+     * với nút Save trong Controller.
+     */
     public BooleanProperty isDirtyProperty() {
         return isDirty;
     }

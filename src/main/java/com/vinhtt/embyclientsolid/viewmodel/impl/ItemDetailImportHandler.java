@@ -21,9 +21,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Helper class xử lý logic Import/Export (UR-45, 46, 47, 49).
- * Logic được port từ ItemDetailImportHandler.java (cũ)
- * và cập nhật để dùng 'Tag' model thay vì 'TagModel'.
+ * Lớp helper (trợ giúp) xử lý logic nghiệp vụ cho tính năng Import/Export JSON
+ * (UR-45, 46, 47, 49).
+ * Lớp này được ủy thác (delegate) bởi {@link ItemDetailViewModel}.
+ * Nó chịu trách nhiệm:
+ * 1. Lưu trạng thái UI (snapshot) trước khi import.
+ * 2. Cập nhật UI với dữ liệu "preview" (xem trước) từ tệp JSON.
+ * 3. Hiển thị/ẩn các nút Accept (✓) / Reject (✗) (UR-46).
+ * 4. Theo dõi các trường đã được chấp nhận (✓) (UR-47).
+ * 5. Khôi phục (revert) trạng thái UI khi nhấn (✗) (UR-47).
  */
 public class ItemDetailImportHandler {
 
@@ -32,22 +38,26 @@ public class ItemDetailImportHandler {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 
     /**
-     * Lưu trạng thái của UI ngay trước khi import.
+     * Lưu trữ "snapshot" (ảnh chụp) của các giá trị UI
+     * ngay trước khi áp dụng dữ liệu import.
+     * (Chỉ dùng khi nhấn Reject ✗).
      */
     private final Map<String, Object> preImportState = new HashMap<>();
 
     /**
-     * DTO gốc từ file JSON.
+     * DTO gốc (đã parse) từ tệp JSON.
      */
     private BaseItemDto importedDto = null;
+
     /**
-     * Tên các trường đã nhấn (✓).
+     * Tập hợp (Set) chứa tên các trường đã được nhấn Accept (✓).
+     * (UR-47).
      */
     private final Set<String> acceptedFields = new HashSet<>();
 
     /**
-     * Properties để BẬT/TẮT các nút review (✓/✗).
-     * (UR-46).
+     * Các Properties (có thể quan sát) để BẬT/TẮT
+     * các nút review (✓/✗) trên UI (UR-46).
      */
     private final ReadOnlyBooleanWrapper showTitleReview = new ReadOnlyBooleanWrapper(false);
     private final ReadOnlyBooleanWrapper showOverviewReview = new ReadOnlyBooleanWrapper(false);
@@ -65,23 +75,25 @@ public class ItemDetailImportHandler {
     }
 
     /**
-     * Nhận DTO, cập nhật UI, báo cho DirtyTracker.
-     * (UR-45, UR-46).
+     * Nhận DTO từ tệp JSON, cập nhật UI để hiển thị "preview" (xem trước),
+     * và bật các nút (✓/✗) tương ứng (UR-45, UR-46).
+     *
+     * @param importedDto DTO đã được parse từ tệp JSON.
      */
     public void importAndPreview(BaseItemDto importedDto) {
         if (importedDto == null) return;
 
         this.importedDto = importedDto;
-        dirtyTracker.startImport(); // Báo cho Tracker: Bắt đầu trạng thái import
+        dirtyTracker.startImport(); // Báo cho Tracker: Bắt đầu trạng thái import (vô hiệu hóa nút Save)
 
         try {
-            clearStateExceptImportedDto(); // Xóa state cũ
-            hideAllReviewButtons();
+            clearStateExceptImportedDto(); // Xóa trạng thái import cũ (nếu có)
+            hideAllReviewButtons(); // Ẩn tất cả nút (✓/✗)
 
             // 1. Title
-            preImportState.put("title", viewModel.titleProperty().get());
-            viewModel.titleProperty().set(importedDto.getName() != null ? importedDto.getName() : "");
-            showTitleReview.set(true);
+            preImportState.put("title", viewModel.titleProperty().get()); // Lưu snapshot
+            viewModel.titleProperty().set(importedDto.getName() != null ? importedDto.getName() : ""); // Cập nhật UI
+            showTitleReview.set(true); // Hiển thị (✓/✗)
 
             // 2. Critic Rating
             preImportState.put("criticRating", viewModel.criticRatingProperty().get());
@@ -99,17 +111,17 @@ public class ItemDetailImportHandler {
             showOriginalTitleReview.set(true);
 
             // 5. Tags
-            preImportState.put("tags", new ArrayList<>(viewModel.getTagItems()));
+            preImportState.put("tags", new ArrayList<>(viewModel.getTagItems())); // Lưu snapshot (List)
             List<Tag> importedTags = new ArrayList<>();
             if (importedDto.getTagItems() != null) {
                 for (NameLongIdPair tagPair : importedDto.getTagItems()) {
                     if (tagPair.getName() != null) {
-                        // Dùng Tag model mới
+                        // Chuyển đổi DTO (NameLongIdPair) sang Model (Tag)
                         importedTags.add(Tag.parse(tagPair.getName(), tagPair.getId() != null ? tagPair.getId().toString() : null));
                     }
                 }
             }
-            viewModel.getTagItems().setAll(importedTags);
+            viewModel.getTagItems().setAll(importedTags); // Cập nhật UI
             showTagsReview.set(true);
 
             // 6. Release Date
@@ -139,10 +151,11 @@ public class ItemDetailImportHandler {
             viewModel.getPeopleItems().setAll(importedPeople);
             showPeopleReview.set(true);
 
-            // 9. Genres (Dùng 'Genres' thay vì 'GenreItems' để tương thích JSON)
+            // 9. Genres
             preImportState.put("genres", new ArrayList<>(viewModel.getGenreItems()));
             List<Tag> importedGenres = new ArrayList<>();
             if (importedDto.getGenres() != null) {
+                // Genres trong DTO là List<String>, không phải NameLongIdPair
                 importedGenres = importedDto.getGenres().stream()
                         .filter(Objects::nonNull)
                         .map(name -> Tag.parse(name, null)) // Genres không có ID
@@ -157,27 +170,30 @@ public class ItemDetailImportHandler {
     }
 
     /**
-     * Nhấn (v) - Chấp nhận.
-     * (UR-47).
+     * Xử lý hành động nhấn nút (✓) - Chấp nhận thay đổi (UR-47).
+     *
+     * @param fieldName Tên trường được chấp nhận (ví dụ: "title").
      */
     public void acceptImportField(String fieldName) {
-        hideReviewButton(fieldName);
-        acceptedFields.add(fieldName);
-        // Báo cho ViewModel (ViewModel sẽ gọi forceDirty của Tracker)
+        hideReviewButton(fieldName); // Ẩn nút (✓/✗)
+        acceptedFields.add(fieldName); // Thêm vào danh sách chờ lưu
+        // Báo cho ViewModel (ViewModel sẽ gọi forceDirty của Tracker
+        // để kích hoạt nút Save (UR-48))
         viewModel.markAsDirtyByAccept();
     }
 
     /**
-     * Nhấn (x) - Hủy bỏ.
-     * (UR-47).
+     * Xử lý hành động nhấn nút (✗) - Hủy bỏ thay đổi (UR-47).
+     *
+     * @param fieldName Tên trường bị từ chối (ví dụ: "title").
      */
     @SuppressWarnings("unchecked")
     public void rejectImportField(String fieldName) {
-        acceptedFields.remove(fieldName);
-        dirtyTracker.pauseTracking(); // Tạm dừng tracker khi revert UI
+        acceptedFields.remove(fieldName); // Xóa khỏi danh sách chờ lưu
+        dirtyTracker.pauseTracking(); // Tạm dừng tracker khi khôi phục UI
 
         try {
-            // Khôi phục giá trị UI từ snapshot
+            // Khôi phục giá trị UI từ "snapshot" (preImportState)
             switch (fieldName) {
                 case "title":
                     viewModel.titleProperty().set((String) preImportState.get("title"));
@@ -192,6 +208,7 @@ public class ItemDetailImportHandler {
                     viewModel.originalTitleProperty().set((String) preImportState.get("originalTitle"));
                     break;
                 case "tags":
+                    // Khôi phục toàn bộ danh sách (List)
                     viewModel.getTagItems().setAll((List<Tag>) preImportState.get("tags"));
                     break;
                 case "releaseDate":
@@ -207,12 +224,15 @@ public class ItemDetailImportHandler {
                     viewModel.getGenreItems().setAll((List<Tag>) preImportState.get("genres"));
                     break;
             }
-            hideReviewButton(fieldName);
+            hideReviewButton(fieldName); // Ẩn nút (✓/✗)
         } finally {
             dirtyTracker.resumeTracking(); // Bật lại tracker
         }
     }
 
+    /**
+     * Helper Ẩn một cặp nút (✓/✗) cụ thể.
+     */
     private void hideReviewButton(String fieldName) {
         switch (fieldName) {
             case "title": showTitleReview.set(false); break;
@@ -227,6 +247,9 @@ public class ItemDetailImportHandler {
         }
     }
 
+    /**
+     * Ẩn TẤT CẢ các cặp nút (✓/✗).
+     */
     public void hideAllReviewButtons() {
         showTitleReview.set(false);
         showCriticRatingReview.set(false);
@@ -240,7 +263,8 @@ public class ItemDetailImportHandler {
     }
 
     /**
-     * Xóa state, reset cờ import, xóa accepted fields.
+     * Xóa toàn bộ trạng thái import (snapshot, DTO, accepted fields).
+     * Được gọi khi clear item hoặc sau khi lưu thành công.
      */
     public void clearState() {
         preImportState.clear();
@@ -249,12 +273,18 @@ public class ItemDetailImportHandler {
         acceptedFields.clear();
     }
 
+    /**
+     * Xóa trạng thái, nhưng giữ lại importedDto (dùng khi bắt đầu import mới).
+     */
     private void clearStateExceptImportedDto() {
         preImportState.clear();
         hideAllReviewButtons();
         acceptedFields.clear();
     }
 
+    /**
+     * Helper chuyển đổi OffsetDateTime sang chuỗi "dd/MM/yyyy".
+     */
     private String dateToString(OffsetDateTime date) {
         if (date == null) return "";
         try {
@@ -263,19 +293,29 @@ public class ItemDetailImportHandler {
     }
 
     // --- Getters cho ViewModel ---
+
+    /**
+     * Kiểm tra xem có đang trong quá trình import hay không.
+     */
     public boolean wasImportInProgress() {
         return importedDto != null;
     }
 
+    /**
+     * Lấy danh sách các trường đã nhấn Accept (✓).
+     */
     public Set<String> getAcceptedFields() {
         return acceptedFields;
     }
 
+    /**
+     * Lấy DTO gốc từ tệp JSON.
+     */
     public BaseItemDto getImportedDto() {
         return importedDto;
     }
 
-    // --- Getters cho các BooleanProperty (v/x) ---
+    // --- Getters cho các BooleanProperty (hiển thị ✓/✗) ---
     public ReadOnlyBooleanProperty showTitleReviewProperty() { return showTitleReview.getReadOnlyProperty(); }
     public ReadOnlyBooleanProperty showCriticRatingReviewProperty() { return showCriticRatingReview.getReadOnlyProperty(); }
     public ReadOnlyBooleanProperty showOverviewReviewProperty() { return showOverviewReview.getReadOnlyProperty(); }
