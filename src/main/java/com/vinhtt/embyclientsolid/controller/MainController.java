@@ -369,6 +369,38 @@ public class MainController {
     }
 
     /**
+     * (MỚI) Xử lý lệnh Tải lại Toàn bộ Dữ liệu (Hotkey Cmd+R).
+     */
+    public void reloadAllData() {
+        // 1. Hiển thị thông báo
+        notificationService.showStatus(configService.getString("mainView", "statusReloading"));
+
+        // 2. Tải lại Cột 1 (Cây)
+        if (libraryTreeController != null) {
+            libraryTreeController.loadLibraries();
+        }
+
+        // 3. Reset Cột 2 (Lưới) về "Home"
+        if (viewModel != null) {
+            viewModel.homeCommand(); // Xóa thanh tìm kiếm
+        }
+        if (itemGridViewModel != null) {
+            itemGridViewModel.loadItemsByParentId(null);
+        }
+
+        // 4. Xóa Cột 3 (Chi tiết) <-- ĐÃ XÓA
+        // Việc Cột 2 tải và chọn item (hoặc chọn null) sẽ tự động
+        // kích hoạt listener (mục 2) để cập nhật Cột 3.
+
+        // 5. Bỏ focus khỏi mọi control
+        Platform.runLater(() -> {
+            if (rootPane != null) {
+                rootPane.requestFocus();
+            }
+        });
+    }
+
+    /**
      * Lấy instance của ItemGridController (dùng cho AppNavigator).
      * @return ItemGridController.
      */

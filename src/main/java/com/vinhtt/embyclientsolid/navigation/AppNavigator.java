@@ -559,6 +559,18 @@ public class AppNavigator implements IAppNavigator {
                 if (this.mainGridVM.canGoForwardProperty().get()) this.mainGridVM.navigateForward();
             });
         }
+
+        // Phím CMD+R (Reload Data)
+        final KeyCombination reloadShortcut = new KeyCodeCombination(KeyCode.R, KeyCombination.SHORTCUT_DOWN);
+        scene.getAccelerators().put(reloadShortcut, () -> {
+            if (mainController != null) {
+                // Hotkey được gọi từ Scene chính
+                mainController.reloadAllData();
+            } else if (this.mainControllerRef != null) {
+                // Hotkey được gọi từ Scene Pop-out
+                this.mainControllerRef.reloadAllData();
+            }
+        });
     }
 
 

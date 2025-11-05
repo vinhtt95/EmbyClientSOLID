@@ -27,6 +27,7 @@
     "statusLoadingLibrary": "Đang tải thư viện...",
     "statusLoadingItems": "Đang tải items...",
     "statusLoadingDetail": "Đang tải chi tiết...",
+    "statusReloading": "Đang tải lại dữ liệu từ server...",
     "errorLoadUI": "Lỗi nghiêm trọng: Không thể tải giao diện.",
     "errorSearchKeywords": "Vui lòng nhập từ khóa tìm kiếm.",
     "errorDialog": "Lỗi: Không thể mở dialog chi tiết. "
