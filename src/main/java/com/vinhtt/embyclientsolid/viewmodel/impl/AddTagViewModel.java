@@ -525,10 +525,16 @@ public class AddTagViewModel implements IAddTagViewModel {
             String name = simpleName.get();
             if (name != null && !name.trim().isEmpty()) {
                 // Tìm xem tag này có ID không (nếu người dùng chọn từ gợi ý)
-                String id = allSimpleSuggestions.stream()
+                // Bước 1: Tìm SuggestionItem trước (nếu có)
+                java.util.Optional<SuggestionItem> matchingItem = allSimpleSuggestions.stream()
                         .filter(item -> item.getName().equalsIgnoreCase(name.trim()))
-                        .map(SuggestionItem::getId)
-                        .findFirst().orElse(null);
+                        .findFirst();
+
+                // Bước 2: Map sang ID một cách an toàn
+                // Nếu matchingItem tồn tại, gọi getId() (có thể trả về null)
+                // Nếu không, trả về null
+                String id = matchingItem.map(SuggestionItem::getId).orElse(null);
+
                 this.result = new AddTagResult(new Tag(name.trim(), id));
             }
         } else {
