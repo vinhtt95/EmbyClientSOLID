@@ -371,6 +371,14 @@ public class ItemDetailController {
         viewModel.getGenreItems().addListener((ListChangeListener<Tag>) c -> updateFlowPane(genresFlowPane, viewModel.getGenreItems(), "GENRE"));
         // (UR-41: Backdrops)
         viewModel.getBackdropImages().addListener((ListChangeListener<ImageInfo>) c -> updateImageGallery());
+
+        // Gọi các hàm update một lần để khởi tạo UI
+        // với dữ liệu hiện có trong ViewModel (quan trọng cho cửa sổ Pop-out)
+        updateFlowPane(tagsFlowPane, viewModel.getTagItems(), "TAG");
+        updateFlowPane(studiosFlowPane, viewModel.getStudioItems(), "STUDIO");
+        updateFlowPane(peopleFlowPane, viewModel.getPeopleItems(), "PEOPLE");
+        updateFlowPane(genresFlowPane, viewModel.getGenreItems(), "GENRE");
+        updateImageGallery();
     }
 
     /**
